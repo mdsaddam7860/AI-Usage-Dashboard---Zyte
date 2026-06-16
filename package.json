@@ -1,0 +1,30 @@
+{
+  "name": "blueprint",
+  "version": "2.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "node server.js",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mdsaddam7860/server-blueprint.git"
+  },
+  "author": "Mohammad Saddam",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mdsaddam7860/server-blueprint/issues"
+  },
+  "homepage": "https://github.com/mdsaddam7860/server-blueprint#readme",
+  "description": "",
+  "dependencies": {
+    "@mohammadsaddam-dev/hubspot-toolkit": "^2.2.0",
+    "axios": "^1.16.1",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-cron": "^4.2.1",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0"
+  }
+}
