@@ -277,10 +277,76 @@ import { apiExecutor } from "../utils/executors.js";
 
 //   return { copilot: rows, copilot_seats: seats };
 // }
+import fs from "fs";
+import path from "path";
+
+// ── Cache helpers ──────────────────────────────────────
+const CACHE_DIR = path.resolve(".cache");
+
+function ensureCacheDir() {
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+}
+
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Returns cached data if it exists and is younger than CACHE_TTL_MS.
+ * Returns null if the file is missing, unreadable, or stale.
+ */
+function readCache(filename) {
+  try {
+    const filePath = path.join(CACHE_DIR, filename);
+    if (!fs.existsSync(filePath)) return null;
+
+    const { savedAt, data } = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const ageMs = Date.now() - new Date(savedAt).getTime();
+
+    if (ageMs > CACHE_TTL_MS) {
+      logger.debug(
+        `Cache stale (${Math.round(ageMs / 1000)}s old): ${filename}`
+      );
+      return null;
+    }
+
+    logger.debug(`Cache hit (${Math.round(ageMs / 1000)}s old): ${filename}`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Writes data wrapped in a { savedAt, data } envelope so TTL can be checked on read.
+ */
+function writeCache(filename, data) {
+  try {
+    ensureCacheDir();
+    const envelope = { savedAt: new Date().toISOString(), data };
+    fs.writeFileSync(
+      path.join(CACHE_DIR, filename),
+      JSON.stringify(envelope, null, 2),
+      "utf8"
+    );
+    logger.debug(`Cache written: ${filename}`);
+  } catch (err) {
+    logger.error(`Cache write failed for ${filename}:`, {
+      message: err.message,
+    });
+  }
+}
 
 // ── Claude Real-Time Fetch Logic ───────────────────────
+const CLAUDE_CACHE_FILE = "claude_data.json";
+
 async function fetchClaudeData(apiKey) {
   if (!apiKey) return { claude: [], claude_seats: [] };
+
+  // 1. Try file cache first
+  const cached = readCache(CLAUDE_CACHE_FILE);
+  if (cached) {
+    logger.debug("Claude: loaded from file cache");
+    return cached;
+  }
 
   const seats = [];
   const rows = [];
@@ -294,7 +360,6 @@ async function fetchClaudeData(apiKey) {
       const params = { limit: 100 };
       if (page) params.page = page;
 
-      // 👇 Wrapped in () => axios(...)
       const r = await apiExecutor(() =>
         axios({
           method: "GET",
@@ -320,7 +385,7 @@ async function fetchClaudeData(apiKey) {
 
         seats.push({
           user: userName,
-          email: email,
+          email,
           user_id: userId,
           limit_usd: limitUsd,
           spend_usd: spendUsd,
@@ -353,12 +418,29 @@ async function fetchClaudeData(apiKey) {
     });
   }
 
-  return { claude: rows, claude_seats: seats };
+  logger.debug(`Claude : ${JSON.stringify(rows, null, 2)}`);
+  logger.debug(`Claude seats : ${JSON.stringify(seats, null, 2)}`);
+
+  const result = { claude: rows, claude_seats: seats };
+
+  // 2. Persist to file cache
+  writeCache(CLAUDE_CACHE_FILE, result);
+
+  return result;
 }
 
 // ── GitHub Copilot Real-Time Fetch Logic ───────────────
+const COPILOT_CACHE_FILE = "copilot_data.json";
+
 async function fetchCopilotData(token, org) {
   if (!token || !org) return { copilot: [], copilot_seats: [] };
+
+  // 1. Try file cache first
+  const cached = readCache(COPILOT_CACHE_FILE);
+  if (cached) {
+    logger.debug("Copilot: loaded from file cache");
+    return cached;
+  }
 
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -370,14 +452,13 @@ async function fetchCopilotData(token, org) {
   let rows = [];
   const fallbackDate = new Date().toISOString();
 
-  // 1. Fetch Seats
+  // 2. Fetch Seats
   try {
     let page = 1;
     let hasMore = true;
 
     while (hasMore) {
       try {
-        // 👇 Wrapped in () => axios(...)
         const seatsRes = await apiExecutor(() =>
           axios({
             method: "GET",
@@ -400,7 +481,6 @@ async function fetchCopilotData(token, org) {
 
             let creditsSpent = 0.0;
             try {
-              // 👇 Wrapped in () => axios(...)
               const creditRes = await apiExecutor(() =>
                 axios({
                   method: "GET",
@@ -468,9 +548,8 @@ async function fetchCopilotData(token, org) {
     logger.error("Failed to fetch Copilot seats:", { message: error.message });
   }
 
-  // 2. Fetch & Parse NDJSON Reports
+  // 3. Fetch & Parse NDJSON Reports
   try {
-    // 👇 Wrapped in () => axios(...)
     const repRes = await apiExecutor(() =>
       axios({
         method: "GET",
@@ -484,13 +563,8 @@ async function fetchCopilotData(token, org) {
     const parsedRows = [];
 
     for (const link of links) {
-      // 👇 Wrapped in () => axios(...)
       const dlRes = await apiExecutor(() =>
-        axios({
-          method: "GET",
-          url: link,
-          responseType: "text",
-        })
+        axios({ method: "GET", url: link, responseType: "text" })
       );
 
       const text = dlRes.data;
@@ -535,7 +609,7 @@ async function fetchCopilotData(token, org) {
             acceptances: interaction.acceptances_count || 0,
             lines_suggested: interaction.lines_suggested || 0,
             lines_accepted: interaction.lines_accepted || 0,
-            chats: chats,
+            chats,
             engaged: interaction.acceptances_count > 0 ? 1 : 0,
           });
         }
@@ -549,6 +623,15 @@ async function fetchCopilotData(token, org) {
     });
   }
 
-  return { copilot: rows, copilot_seats: seats };
+  logger.debug(`Copilot : ${JSON.stringify(rows, null, 2)}`);
+  logger.debug(`Copilot Seats : ${JSON.stringify(seats, null, 2)}`);
+
+  const result = { copilot: rows, copilot_seats: seats };
+
+  // 4. Persist to file cache
+  writeCache(COPILOT_CACHE_FILE, result);
+
+  return result;
 }
+
 export { fetchClaudeData, fetchCopilotData };

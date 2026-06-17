@@ -694,6 +694,23 @@
         display: inline-block;
         vertical-align: middle;
       }
+      /* Custom Scrollbar for the Token List */
+      .scrollable-list::-webkit-scrollbar {
+        width: 4px;
+      }
+
+      .scrollable-list::-webkit-scrollbar-track {
+        background: transparent;
+      }
+
+      .scrollable-list::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+
+      .scrollable-list::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
     </style>
   </head>
   <body>
@@ -784,7 +801,7 @@
             <div class="stat-value" id="stat-sum-caps">—</div>
             <div class="stat-sub" id="stat-custom-caps">—</div>
           </div>
-          <div class="stat">
+          <div class="stat" style="display: none">
             <div class="stat-label">Org Spend Limit</div>
             <div class="stat-value" id="stat-org-limit">—</div>
             <div class="stat-sub" id="stat-org-used">—</div>
@@ -873,16 +890,23 @@
           <canvas id="clSpend" height="65"></canvas>
         </div>
 
-        <div class="insight-grid">
+        <!-- <div class="insight-grid">
           <div class="insight bad">
             <div class="insight-label">🔥 Highest Single User</div>
             <div class="insight-value" id="insight-high-val">—</div>
             <div class="insight-sub" id="insight-high-sub">—</div>
-          </div>
-          <div class="insight warn">
-            <div class="insight-label">⚠ Near Cap (≥75%)</div>
-            <div class="insight-value" id="insight-near-val">—</div>
-            <div class="insight-sub" id="insight-near-sub">—</div>
+          </div> -->
+        <!-- NEAR CAP (Orange/Amber border) -->
+        <!-- <div class="insight warn">
+            <div class="insight-label">⚠️ NEAR CAP (≥75%)</div>
+            <div
+              class="insight-value"
+              style="color: var(--amber)"
+              id="cl-near-cap-val"
+            >
+              —
+            </div>
+            <div class="insight-sub" id="cl-near-cap-sub">—</div>
           </div>
           <div class="insight warn">
             <div class="insight-label">💤 Zero Spend Members</div>
@@ -891,28 +915,102 @@
               Have seats but $0 spend — review if needed
             </div>
           </div>
+        </div> -->
+
+        <div class="insight-grid">
+          <!-- HIGHEST SINGLE USER (Red border) -->
+          <div class="insight bad">
+            <div class="insight-label">🔥 HIGHEST SINGLE USER</div>
+            <div
+              class="insight-value"
+              style="color: var(--red)"
+              id="cl-highest-val"
+            >
+              —
+            </div>
+            <div class="insight-sub" id="cl-highest-sub">—</div>
+          </div>
+
+          <!-- NEAR CAP (Orange/Amber border) -->
+          <div class="insight warn">
+            <div class="insight-label">⚠️ NEAR CAP (≥75%)</div>
+            <div
+              class="insight-value"
+              style="color: var(--amber)"
+              id="cl-near-cap-val"
+            >
+              —
+            </div>
+            <div class="insight-sub" id="cl-near-cap-sub">—</div>
+          </div>
+
+          <!-- ZERO SPEND MEMBERS (Blue border) -->
+          <div class="insight info">
+            <div class="insight-label">💤 ZERO SPEND MEMBERS</div>
+            <div
+              class="insight-value"
+              style="color: var(--blue)"
+              id="cl-zero-val"
+            >
+              —
+            </div>
+            <div class="insight-sub" id="cl-zero-sub">
+              Have seats but $0 spend — review if needed
+            </div>
+          </div>
         </div>
 
         <div class="grid-3">
-          <div class="card" style="margin: 0">
+          <div class="card">
             <div class="card-title">🚨 Running Out of Token Soon</div>
             <div class="card-sub">Members above 80% of their cap</div>
-            <div class="empty" id="cl-approaching-empty">Calculating...</div>
-            <div style="margin-top: 12px" id="cl-approaching-container">
+
+            <!-- 👇 ADDED THIS WRAPPER 👇 -->
+            <div
+              class="scrollable-list"
+              style="
+                max-height: 280px;
+                overflow-y: auto;
+                padding-right: 5px;
+                margin-top: 10px;
+              "
+            >
+              <!-- Critical Users -->
+              <div id="critical-tokens-list">
+                <div
+                  style="
+                    padding: 10px;
+                    text-align: center;
+                    color: #94a3b8;
+                    font-size: 12px;
+                    background: #f8fafc;
+                    border-radius: 6px;
+                    border: 1px dashed #cbd5e1;
+                  "
+                >
+                  Calculating...
+                </div>
+              </div>
+
               <div
+                class="card-sub"
                 style="
+                  margin-top: 20px;
                   font-size: 11px;
-                  font-weight: 700;
-                  color: var(--muted);
-                  margin-bottom: 8px;
+                  font-weight: 600;
                   text-transform: uppercase;
-                  letter-spacing: 0.05em;
+                  letter-spacing: 0.5px;
                 "
               >
                 Approaching (75–80%)
               </div>
-              <div id="cl-approaching-list"></div>
+
+              <!-- Approaching Users -->
+              <div id="approaching-tokens-list" style="margin-top: 10px">
+                <!-- Filled by JS -->
+              </div>
             </div>
+            <!-- 👆 END WRAPPER 👆 -->
           </div>
           <div class="card" style="margin: 0">
             <div class="card-title">🏆 Top Spenders Today</div>
@@ -927,7 +1025,7 @@
         </div>
 
         <div class="grid-2">
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">🏢 Spend by Team</div>
             <div class="card-sub">MTD aggregated by team</div>
             <canvas id="clTeamChart" height="160"></canvas>
@@ -935,7 +1033,31 @@
           <div class="card" style="margin: 0">
             <div class="card-title">🤖 Tokens by Model</div>
             <div class="card-sub">Token distribution across models</div>
-            <canvas id="clModelChart" height="160"></canvas>
+
+            <div
+              style="
+                display: flex;
+                align-items: center;
+                gap: 32px;
+                margin-top: 15px;
+              "
+            >
+              <div
+                style="
+                  position: relative;
+                  width: 180px;
+                  height: 180px;
+                  flex-shrink: 0;
+                "
+              >
+                <canvas id="clModelChart" width="180" height="180"></canvas>
+              </div>
+
+              <div
+                id="clModelLegend"
+                style="display: flex; flex-direction: column; gap: 10px"
+              ></div>
+            </div>
           </div>
         </div>
 
@@ -1098,12 +1220,12 @@
         </div>
 
         <div class="insight-grid">
-          <div class="insight cp good">
+          <div class="insight cp good" style="display: none">
             <div class="insight-label">🏆 Best Accept Rate Team</div>
             <div class="insight-value" id="best-team-val">—</div>
             <div class="insight-sub" id="best-team-sub">—</div>
           </div>
-          <div class="insight cp bad">
+          <div class="insight cp bad" style="display: none">
             <div class="insight-label">📉 Lowest Accept Rate Team</div>
             <div class="insight-value" id="worst-team-val">—</div>
             <div class="insight-sub" id="worst-team-sub">—</div>
@@ -1118,7 +1240,7 @@
             <div class="insight-value" id="top-lang-val">—</div>
             <div class="insight-sub" id="top-lang-sub">—</div>
           </div>
-          <div class="insight cp good">
+          <div class="insight cp good" style="display: none">
             <div class="insight-label">📦 Lines Accepted / User</div>
             <div class="insight-value" id="lines-user-val">—</div>
             <div class="insight-sub" id="lines-user-sub">—</div>
@@ -1137,7 +1259,7 @@
             <div class="card-sub">No activity in 30+ days · $19/seat/mo</div>
             <div id="cp-reclaim"></div>
           </div>
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">💰 Cost by Team</div>
             <div class="card-sub">Monthly seat cost per team</div>
             <canvas id="cpTeamChart" height="230"></canvas>
@@ -1151,12 +1273,12 @@
 
         <!-- Charts row -->
         <div class="grid-2">
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">📊 Suggestions Shown vs Accepted</div>
             <div class="card-sub">Daily trend — last 28 days</div>
             <canvas id="cpAcceptChart" height="130"></canvas>
           </div>
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">📈 Accept Rate Over Time</div>
             <div class="card-sub">
               Is Copilot getting more useful? Trend over 28 days
@@ -1169,9 +1291,20 @@
           <div class="card" style="margin: 0">
             <div class="card-title">🌍 Top Languages</div>
             <div class="card-sub">By suggestion count</div>
-            <canvas id="cpLangChart" height="160"></canvas>
+
+            <!-- Wrapper to enforce the 220px height constraint -->
+            <div
+              style="
+                position: relative;
+                height: 220px;
+                width: 100%;
+                margin-top: 15px;
+              "
+            >
+              <canvas id="cpLangChart"></canvas>
+            </div>
           </div>
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">📏 Lines of Code Accepted (Daily)</div>
             <div class="card-sub">AI-written code merged by your team</div>
             <canvas id="cpLinesChart" height="160"></canvas>

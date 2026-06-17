@@ -560,23 +560,100 @@ function renderCopilot() {
 // REAL-TIME DATA INTEGRATION
 // ─────────────────────────────────────────────────────
 function updateClaudeDashboard(clMembers) {
-  // 1. Calculations
-  const totalSpend = clMembers.reduce((sum, m) => sum + m.spend, 0);
-  const activeMembers = clMembers.filter((m) => m.spend > 0);
-  const activeCount = activeMembers.length;
-  const inactiveCount = clMembers.length - activeCount;
+  if (!clMembers || clMembers.length === 0) return;
 
-  const totalCaps = clMembers.reduce((sum, m) => sum + (m.cap || 0), 0);
-  const capsCount = clMembers.filter((m) => m.cap > 0).length;
-  const avgActive = activeCount > 0 ? totalSpend / activeCount : 0;
-
-  // 2. Safely Inject into IDs
+  // 1. Define Helper First (Must be at the top!)
   const set = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
 
-  // Stat Bar
+  // 2. High-Level Calculations for Stat Bar
+  const totalSpend = clMembers.reduce(
+    (sum, m) => sum + (m.spend_usd || m.spend || 0),
+    0
+  );
+  const activeMembers = clMembers.filter(
+    (m) => (m.spend_usd || m.spend || 0) > 0
+  );
+  const activeCount = activeMembers.length;
+  const inactiveCount = clMembers.length - activeCount;
+
+  const totalCaps = clMembers.reduce(
+    (sum, m) => sum + (m.limit_usd || m.cap || 0),
+    0
+  );
+  const capsCount = clMembers.filter(
+    (m) => (m.limit_usd || m.cap || 0) > 0
+  ).length;
+  const avgActive = activeCount > 0 ? totalSpend / activeCount : 0;
+
+  // 3. Top Row Card Calculations
+  let highestUser = { name: "—", spend: -1 };
+  let nearCapCount = 0;
+  let zeroSpendCount = 0;
+
+  clMembers.forEach((m) => {
+    // Safely grab spend and limit handling different possible key names
+    const rawSpend =
+      m.spend_usd !== undefined ? m.spend_usd : m.spend || m.mtd_spend || 0;
+    const rawLimit =
+      m.limit_usd !== undefined ? m.limit_usd : m.limit || m.cap || 0;
+
+    const spend =
+      typeof rawSpend === "string"
+        ? parseFloat(rawSpend.replace(/[^0-9.-]+/g, ""))
+        : rawSpend;
+    const limit =
+      typeof rawLimit === "string"
+        ? parseFloat(rawLimit.replace(/[^0-9.-]+/g, ""))
+        : rawLimit;
+    const name = m.user || m.name || "Unknown";
+
+    // Track Highest User
+    if (spend > highestUser.spend) {
+      highestUser = { name: name, spend: spend };
+    }
+
+    // Track Near Cap
+    if (limit > 0) {
+      const ratio = spend / limit;
+      const percent = Math.round(ratio * 100);
+      if (percent >= 75) {
+        nearCapCount++;
+      }
+    }
+
+    // Track Zero Spend
+    if (spend === 0) {
+      zeroSpendCount++;
+    }
+  });
+
+  // 4. Inject Top Cards Data (Highest, Near Cap, Zero Spend)
+  if (highestUser.spend >= 0) {
+    set("cl-highest-val", highestUser.name);
+    set(
+      "cl-highest-sub",
+      `$${highestUser.spend.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+      })} spent MTD`
+    );
+  }
+
+  set("cl-near-cap-val", nearCapCount);
+  if (nearCapCount === 0) {
+    set("cl-near-cap-sub", "All users healthy");
+  } else if (nearCapCount === 1) {
+    set("cl-near-cap-sub", "1 user needs attention");
+  } else {
+    set("cl-near-cap-sub", `${nearCapCount} users need attention`);
+  }
+
+  set("cl-zero-val", zeroSpendCount);
+  set("cl-zero-sub", `${zeroSpendCount} users have seats but $0 spend`);
+
+  // 5. Inject Stat Bar Data
   set(
     "stat-total-spend",
     `$${totalSpend.toLocaleString(undefined, {
@@ -591,96 +668,342 @@ function updateClaudeDashboard(clMembers) {
   set("stat-sum-caps", `$${totalCaps.toLocaleString()}`);
   set("stat-custom-caps", `${capsCount} custom per-person limits`);
 
-  // Insights
-  if (activeMembers.length > 0) {
-    const highest = [...activeMembers].sort((a, b) => b.spend - a.spend)[0];
-    set("insight-high-val", `$${highest.spend.toLocaleString()}`);
-    set(
-      "insight-high-sub",
-      `${highest.name} · ${((highest.spend / totalSpend) * 100).toFixed(
-        0
-      )}% of total`
-    );
-  }
-  set("insight-zero-val", `${inactiveCount} members`);
-
-  // Members count in table header
+  // 6. Generic UI Updates
   set("cl-members-count", `Members (${clMembers.length})`);
-  // Add this inside updateClaudeDashboard
-  document.getElementById(
-    "tab-count-cl"
-  ).textContent = `${clMembers.length} members`;
+  set("tab-count-cl", `${clMembers.length} members`);
 }
-function updateCopilotDashboard(cpSeatsData) {
+// We MUST accept both cpRows (the event data) AND cpSeatsData (the billing/seat data)
+function updateCopilotDashboard(cpRows, cpSeatsData) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
+  if (!cpRows) cpRows = [];
 
-  // 1. Calculations
-  const totalSeats = cpSeatsData.length;
-  const activeSeats = cpSeatsData.filter((s) => s.activity === "active");
-  const inactive = cpSeatsData.filter((s) => s.activity === "inactive");
-  const monthlyCost = cpSeatsData.reduce((sum, s) => sum + s.cost, 0);
-  const totalLines = cpSeatsData.reduce(
-    (sum, s) => sum + (s.lines_accepted || 0),
-    0
-  );
-
-  // Best/Worst Team Logic
-  const teamStats = {};
-  cpSeatsData.forEach((s) => {
-    if (!teamStats[s.team]) teamStats[s.team] = { lines: 0, shown: 0 };
-    teamStats[s.team].lines += s.lines_accepted || 0;
-    teamStats[s.team].shown += s.total_shown || 1;
-  });
-  const teamList = Object.keys(teamStats)
-    .map((t) => ({
-      t,
-      rate: (teamStats[t].lines / teamStats[t].shown) * 100,
-    }))
-    .sort((a, b) => b.rate - a.rate);
-
-  // 2. Injecting Stats
   const set = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
 
-  // Hero Bar
-  const hoursSaved = (totalLines * 4) / 60;
-  const costSavings = hoursSaved * 75 - monthlyCost;
-
-  set("hero-time-saved", `~${Math.round(hoursSaved).toLocaleString()} hrs/mo`);
-  set("hero-cost-savings", `~$${Math.round(costSavings).toLocaleString()}/mo`);
-  set(
-    "hero-reclaimable",
-    `$${inactive.reduce((sum, s) => sum + s.cost, 0).toLocaleString()}/mo`
+  // --- 1. SEAT DATA CALCULATIONS (Billing & High-Level) ---
+  const activeSeats = cpSeatsData.filter((s) => s.activity === "active");
+  const inactive = cpSeatsData.filter((s) => s.activity === "inactive");
+  const monthlyCost = cpSeatsData.reduce(
+    (sum, s) => sum + (s.cost || s.limit_usd || 0),
+    0
   );
+  const reclaimableCost = inactive.reduce(
+    (sum, s) => sum + (s.cost || s.limit_usd || 0),
+    0
+  );
+  const neverUsedCount = cpSeatsData.filter(
+    (s) => s.last === "Never" || (s.spend_usd || 0) === 0
+  ).length;
 
-  // Insights
-  if (teamList.length > 0) {
-    set("best-team-val", teamList[0].t);
-    set("best-team-sub", `${teamList[0].rate.toFixed(1)}% acceptance`);
-    set("worst-team-val", teamList[teamList.length - 1].t);
-    set(
-      "worst-team-sub",
-      `${teamList[teamList.length - 1].rate.toFixed(1)}% acceptance`
-    );
+  // --- 2. MAP USERS TO EDITORS (Fix for "Unknown" Editor) ---
+  const userToEditorMap = {};
+  cpSeatsData.forEach((s) => {
+    if (s.user && s.last_editor && s.last_editor.toLowerCase() !== "unknown") {
+      const raw = s.last_editor.toLowerCase();
+      if (raw.includes("vscode")) userToEditorMap[s.user] = "VS Code";
+      else if (raw.includes("intellij"))
+        userToEditorMap[s.user] = "IntelliJ IDEA";
+      else if (raw.includes("visualstudio"))
+        userToEditorMap[s.user] = "Visual Studio";
+      // Fallback for standardizing things like "eclipse/1.0"
+      else
+        userToEditorMap[s.user] = s.last_editor
+          .split("/")[0]
+          .replace(/^\w/, (c) => c.toUpperCase());
+    }
+  });
+
+  // --- 3. ROW DATA CALCULATIONS (Usage & Interactions) ---
+  let langStats = {};
+  let editorStats = {};
+  let teamAcceptanceStats = {};
+  let totalLinesAccepted = 0;
+  let activeUsersSet = new Set();
+
+  // Track daily numbers for the bottom charts
+  let dailyStats = {};
+
+  if (cpRows && cpRows.length > 0) {
+    cpRows.forEach((r) => {
+      // Top Language
+      let lang = r.language || "Unknown";
+      if (lang === "typescript") lang = "TypeScript";
+      else if (lang === "javascript") lang = "JavaScript";
+      else if (lang === "python") lang = "Python";
+      else if (lang !== "Unknown")
+        lang = lang.charAt(0).toUpperCase() + lang.slice(1);
+
+      const activity = r.suggestions > 0 ? r.suggestions : r.chats || 0;
+      if (activity > 0) langStats[lang] = (langStats[lang] || 0) + activity;
+
+      // Dominant Editor (Using Map Fallback)
+      let rawEditor = userToEditorMap[r.user] || r.editor || "Unknown";
+      let editor = "Unknown";
+
+      if (rawEditor.toLowerCase().includes("vscode")) editor = "VS Code";
+      else if (rawEditor.toLowerCase().includes("intellij"))
+        editor = "IntelliJ IDEA";
+      else if (rawEditor.toLowerCase().includes("visualstudio"))
+        editor = "Visual Studio";
+      else if (rawEditor.toLowerCase() !== "unknown") {
+        editor = rawEditor.split("/")[0];
+        editor = editor.charAt(0).toUpperCase() + editor.slice(1);
+      }
+
+      if (activity > 0) {
+        // ONLY tally known editors to prevent "Unknown" from winning
+        if (editor !== "Unknown") {
+          editorStats[editor] = (editorStats[editor] || 0) + activity;
+        }
+        activeUsersSet.add(r.user);
+      }
+
+      // Team Acceptance Rates
+      let team = r.team || "Unknown";
+      if (!teamAcceptanceStats[team])
+        teamAcceptanceStats[team] = { suggestions: 0, acceptances: 0 };
+      teamAcceptanceStats[team].suggestions += r.suggestions || 0;
+      teamAcceptanceStats[team].acceptances += r.acceptances || 0;
+
+      // Lines Accepted
+      totalLinesAccepted += r.lines_accepted || 0;
+
+      // Daily Aggregation for Trend Charts
+      if (r.date && r.date !== "unknown-date") {
+        const d = new Date(r.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        });
+        if (!dailyStats[d]) dailyStats[d] = { shown: 0, accepted: 0, lines: 0 };
+        dailyStats[d].shown += r.suggestions || 0;
+        dailyStats[d].accepted += r.acceptances || 0;
+        dailyStats[d].lines += r.lines_accepted || 0;
+      }
+    });
+  } else {
+    // Fallback logic if row data is completely missing
+    cpSeatsData.forEach((s) => {
+      totalLinesAccepted += s.lines_accepted || 0;
+      if (s.lines_accepted > 0) activeUsersSet.add(s.user);
+    });
   }
 
-  set(
-    "lines-user-val",
-    Math.round(totalLines / (activeSeats.length || 1)).toLocaleString()
-  );
-  set("lines-user-sub", "avg per active user this month");
+  // --- 4. SORTING AND AGGREGATING WINNERS ---
+  const sortedLangs = Object.entries(langStats).sort((a, b) => b[1] - a[1]);
+  const sortedEditors = Object.entries(editorStats).sort((a, b) => b[1] - a[1]);
 
-  set(
-    "never-used-val",
-    `${cpSeatsData.filter((s) => s.last === "Never").length} seats`
-  );
+  const teamRates = Object.keys(teamAcceptanceStats)
+    .map((t) => {
+      const s = teamAcceptanceStats[t].suggestions;
+      const rate = s > 0 ? (teamAcceptanceStats[t].acceptances / s) * 100 : 0;
+      return { name: t, rate: rate, suggestions: s };
+    })
+    .filter((t) => t.suggestions > 50)
+    .sort((a, b) => b.rate - a.rate);
+
+  const avgLines =
+    activeUsersSet.size > 0
+      ? Math.round(totalLinesAccepted / activeUsersSet.size)
+      : 0;
+
+  // ROI Math
+  const hoursSaved = (totalLinesAccepted * 4) / 60;
+  const costSavings = hoursSaved * 75 - monthlyCost;
+
+  // --- 5. INJECT DATA INTO UI ---
+  set("hero-time-saved", `~${Math.round(hoursSaved).toLocaleString()} hrs/mo`);
+  set("hero-cost-savings", `~$${Math.round(costSavings).toLocaleString()}/mo`);
+  set("hero-reclaimable", `$${reclaimableCost.toLocaleString()}/mo`);
+
+  if (sortedLangs.length > 0) {
+    set("top-lang-val", sortedLangs[0][0]);
+    set("top-lang-sub", `${sortedLangs[0][1].toLocaleString()} events`);
+  }
+
+  if (sortedEditors.length > 0) {
+    set("dom-editor-val", sortedEditors[0][0]);
+    set("dom-editor-sub", `${sortedEditors[0][1].toLocaleString()} events`);
+  } else {
+    set("dom-editor-val", "—");
+    set("dom-editor-sub", "No data");
+  }
+
+  if (teamRates.length > 0) {
+    const best = teamRates[0];
+    const worst = teamRates[teamRates.length - 1];
+    set("best-team-val", `${best.rate.toFixed(1)}%`);
+    set("best-team-sub", best.name);
+    set("worst-team-val", `${worst.rate.toFixed(1)}%`);
+    set("worst-team-sub", worst.name);
+  } else {
+    set("best-team-val", "—");
+    set("best-team-sub", "Not enough data");
+    set("worst-team-val", "—");
+    set("worst-team-sub", "Not enough data");
+  }
+
+  set("lines-user-val", avgLines.toLocaleString());
+  set("lines-user-sub", "Avg per active user this month");
+
+  set("never-used-val", neverUsedCount);
   set("never-used-sub", "Immediate reclaim candidates");
-  // Add this inside updateCopilotDashboard
-  document.getElementById(
-    "tab-count-cp"
-  ).textContent = `${cpSeatsData.length} seats`;
+
+  const tabBadge = document.getElementById("tab-count-cp");
+  if (tabBadge) tabBadge.textContent = `${cpSeatsData.length} seats`;
+
+  // --- 6. RENDER ALL CHARTS ---
+  const drawChart = (canvasId, config) => {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (window[canvasId + "Instance"]) window[canvasId + "Instance"].destroy();
+    window[canvasId + "Instance"] = new Chart(ctx, config);
+  };
+
+  // Top Languages
+  if (sortedLangs.length > 0) {
+    drawChart("cpLangChart", {
+      type: "doughnut",
+      data: {
+        labels: sortedLangs.map((item) => item[0]),
+        datasets: [
+          {
+            data: sortedLangs.map((item) => item[1]),
+            backgroundColor: [
+              "#8b5cf6",
+              "#3b82f6",
+              "#10b981",
+              "#f59e0b",
+              "#ef4444",
+              "#ec4899",
+              "#64748b",
+            ],
+            borderWidth: 0,
+            hoverOffset: 6,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "75%",
+        plugins: {
+          legend: {
+            position: "right",
+            labels: {
+              usePointStyle: true,
+              boxWidth: 8,
+              color: "#64748b",
+              font: { size: 11 },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // Active Editors
+  if (sortedEditors.length > 0) {
+    drawChart("cpEditorChart", {
+      type: "bar",
+      data: {
+        labels: sortedEditors.map((item) => item[0]),
+        datasets: [
+          {
+            label: "Active Seats",
+            data: sortedEditors.map((item) => item[1]),
+            backgroundColor: "#3b82f6",
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+      },
+    });
+  }
+
+  // Daily Trend Charts (Bottom row)
+  const dates = Object.keys(dailyStats);
+  if (dates.length > 0) {
+    const shownData = dates.map((d) => dailyStats[d].shown);
+    const acceptedData = dates.map((d) => dailyStats[d].accepted);
+    const rateData = dates.map((d) =>
+      dailyStats[d].shown > 0
+        ? (dailyStats[d].accepted / dailyStats[d].shown) * 100
+        : 0
+    );
+    const linesData = dates.map((d) => dailyStats[d].lines);
+
+    drawChart("cpTrendChart", {
+      type: "bar",
+      data: {
+        labels: dates,
+        datasets: [
+          {
+            label: "Shown",
+            data: shownData,
+            backgroundColor: "#e2e8f0",
+            borderRadius: 4,
+          },
+          {
+            label: "Accepted",
+            data: acceptedData,
+            backgroundColor: "#8b5cf6",
+            borderRadius: 4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { x: { stacked: true }, y: { stacked: false } },
+      },
+    });
+
+    drawChart("cpRateChart", {
+      type: "line",
+      data: {
+        labels: dates,
+        datasets: [
+          {
+            label: "Accept Rate %",
+            data: rateData,
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 100 } },
+      },
+    });
+
+    drawChart("cpLinesChart", {
+      type: "line",
+      data: {
+        labels: dates,
+        datasets: [
+          {
+            label: "Lines Accepted",
+            data: linesData,
+            borderColor: "#10b981",
+            backgroundColor: "rgba(16, 185, 129, 0.1)",
+            fill: true,
+            tension: 0.4,
+          },
+        ],
+      },
+      options: { responsive: true, maintainAspectRatio: false },
+    });
+  }
 }
 function updateCopilotHeroBar(cpSeatsData) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
@@ -971,6 +1294,159 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
     },
   });
 }
+
+function updateTokenWarnings(clMembers) {
+  if (!clMembers || clMembers.length === 0) return;
+
+  const criticalContainer = document.getElementById("critical-tokens-list");
+  const approachingContainer = document.getElementById(
+    "approaching-tokens-list"
+  );
+
+  if (!criticalContainer || !approachingContainer) return;
+
+  let criticalHtml = "";
+  let approachingHtml = "";
+
+  // 1. Normalize the data (Handles string formats and alternate key names like 'cap' or 'name')
+  const normalizedMembers = clMembers
+    .map((m) => {
+      const rawSpend =
+        m.spend_usd !== undefined ? m.spend_usd : m.spend || m.mtd_spend || 0;
+      const rawLimit =
+        m.limit_usd !== undefined ? m.limit_usd : m.limit || m.cap || 0;
+
+      // Strip out any '$' or ',' if the data came in as a formatted string
+      const spend =
+        typeof rawSpend === "string"
+          ? parseFloat(rawSpend.replace(/[^0-9.-]+/g, ""))
+          : rawSpend;
+      const limit =
+        typeof rawLimit === "string"
+          ? parseFloat(rawLimit.replace(/[^0-9.-]+/g, ""))
+          : rawLimit;
+
+      return {
+        ...m,
+        cleanSpend: spend,
+        cleanLimit: limit,
+        displayName: m.user || m.name || "Unknown User",
+      };
+    })
+    .filter((m) => m.cleanLimit > 0); // Ignore users with no cap set
+
+  // 2. Sort by highest spend first
+  const sortedMembers = normalizedMembers.sort(
+    (a, b) => b.cleanSpend - a.cleanSpend
+  );
+
+  sortedMembers.forEach((member) => {
+    const ratio = member.cleanSpend / member.cleanLimit;
+
+    // 3. Round the percentage to match the UI table exactly (e.g., 79.5% becomes 80%)
+    const displayPercent = Math.round(ratio * 100);
+
+    const rowHtml = `
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #e2e8f0;">
+        <div>
+          <div style="font-size: 13px; font-weight: 500; color: #334155;">${
+            member.displayName
+          }</div>
+          <div style="font-size: 11px; color: #64748b;">
+            $${member.cleanSpend.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })} / $${member.cleanLimit.toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+    })}
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 13px; font-weight: 600; color: ${
+            displayPercent >= 80 ? "#ef4444" : "#f59e0b"
+          };">
+            ${displayPercent}%
+          </div>
+        </div>
+      </div>
+    `;
+
+    // 4. Categorize based on the rounded percentage
+    if (displayPercent >= 80) {
+      criticalHtml += rowHtml;
+    } else if (displayPercent >= 75) {
+      approachingHtml += rowHtml;
+    }
+  });
+
+  // 5. Inject HTML or fallback to empty states
+  criticalContainer.innerHTML =
+    criticalHtml ||
+    `
+    <div style="padding: 10px; text-align: center; color: #10b981; font-size: 12px; background: #ecfdf5; border-radius: 6px; border: 1px dashed #a7f3d0;">
+      ✓ No users in critical state
+    </div>`;
+
+  approachingContainer.innerHTML =
+    approachingHtml ||
+    `
+    <div style="padding: 10px; text-align: center; color: #94a3b8; font-size: 12px;">
+      No users currently approaching limit
+    </div>`;
+}
+// ── Tokens by Model donut ──────────────────────────────
+function renderClModelChart(rows) {
+  // Aggregate total_tokens per model from your data
+  const modelTotals = {};
+  for (const row of rows) {
+    const m = row.model || "unknown";
+    modelTotals[m] = (modelTotals[m] || 0) + (row.total_tokens || 0);
+  }
+
+  const labels = Object.keys(modelTotals);
+  const values = Object.values(modelTotals);
+  const palette = ["#7F77DD", "#C084FC", "#5DCAA5", "#D85A30", "#378ADD"];
+  const colors = labels.map((_, i) => palette[i % palette.length]);
+
+  // Build legend manually
+  const legend = document.getElementById("clModelLegend");
+  legend.innerHTML = "";
+  labels.forEach((label, i) => {
+    const total = values.reduce((a, b) => a + b, 0);
+    const pct = total > 0 ? ((values[i] / total) * 100).toFixed(1) : 0;
+    legend.innerHTML += `
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="width:12px;height:12px;border-radius:3px;background:${colors[i]};flex-shrink:0;"></span>
+        <span style="font-size:13px;">${label}</span>
+        <span style="font-size:12px;color:#888;margin-left:4px;">${pct}%</span>
+      </div>`;
+  });
+
+  // Destroy previous instance if re-rendering
+  const existing = Chart.getChart("clModelChart");
+  if (existing) existing.destroy();
+
+  new Chart(document.getElementById("clModelChart"), {
+    type: "doughnut",
+    data: {
+      labels,
+      datasets: [
+        {
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 0,
+          hoverOffset: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: false, // ← required alongside width/height attrs
+      maintainAspectRatio: false,
+      cutout: "65%",
+      plugins: { legend: { display: false } },
+    },
+  });
+}
 // ─────────────────────────────────────────────────────
 // 2. FETCH DATA (THE ONLY SOURCE OF TRUTH)
 // ─────────────────────────────────────────────────────
@@ -1071,13 +1547,16 @@ async function fetchRealTimeDashboardData() {
 
     // 1. Update the UI Stats (Dashboard Cards)
     updateClaudeDashboard(clMembers);
-    updateCopilotDashboard(cpSeatsData);
+    updateTokenWarnings(clMembers);
+    updateCopilotDashboard(payload.copilot, cpSeatsData);
     updateCopilotHeroBar(cpSeatsData);
     updateSavingsBanner(cpSeatsData);
 
     // 2. Render Charts (Final step, done only once)
     renderClaude();
     renderCopilot();
+    renderClModelChart(payload.claude);
+
     // 3. FIX: Trigger the "All" view to populate the Table and Stats automatically
     // This calls your existing filtering function as if you had clicked "All"
     filterSeats("all", null);

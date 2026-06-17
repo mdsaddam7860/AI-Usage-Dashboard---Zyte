@@ -5,6 +5,7 @@
 
 # File or Folder to be ignored in all situations
 .DS_Store
+.cache/
 
 ### Node ###
 # Logs
