@@ -52,12 +52,16 @@ function exportToCSVCopilot() {
   // 4. Create a Blob and trigger the download
   const csvString = csvRows.join("\n");
   const blob = new Blob([csvString], { type: "text/csv" });
-  const url = window.URL.createObjectURL(blob);
+  const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");
   a.setAttribute("href", url);
   a.setAttribute("download", "copilot_seats_report.csv");
   a.click();
+
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(url);
 }
 function exportToCSVClaude() {
   const data = clMembers;
