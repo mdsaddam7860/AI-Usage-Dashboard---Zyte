@@ -6,6 +6,7 @@
 # File or Folder to be ignored in all situations
 .DS_Store
 .cache/
+temp.js
 
 ### Node ###
 # Logs

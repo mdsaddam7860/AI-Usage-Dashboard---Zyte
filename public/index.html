@@ -32,6 +32,36 @@
         margin: 0;
         padding: 0;
       }
+      /* Smooth scrolling behavior */
+      .scrollable-list {
+        scroll-behavior: smooth;
+        -webkit-overflow-scrolling: touch; /* Enables momentum scrolling on touch devices/Mac trackpads */
+        padding-right: 8px; /* Gives the text some breathing room away from the scrollbar */
+      }
+
+      /* Custom modern scrollbar for Chrome, Safari, and Edge */
+      .scrollable-list::-webkit-scrollbar {
+        width: 6px; /* Make it nice and thin */
+      }
+
+      .scrollable-list::-webkit-scrollbar-track {
+        background: transparent; /* Keep the background clean */
+      }
+
+      .scrollable-list::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1; /* A subtle gray that matches your borders */
+        border-radius: 10px; /* Make it a pill shape */
+      }
+
+      .scrollable-list::-webkit-scrollbar-thumb:hover {
+        background-color: #94a3b8; /* Darken slightly when hovered */
+      }
+
+      /* Firefox compatibility for the scrollbar */
+      .scrollable-list {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+      }
       body {
         background: var(--bg);
         color: var(--text);
@@ -748,23 +778,6 @@
 
     <!-- ═══════════════════════════════ CLAUDE ═══════════════════════════════ -->
     <div id="page-claude" class="page active">
-      <div class="filter-bar">
-        <span class="fb-label">Source</span>
-        <select>
-          <option>All sources</option>
-        </select>
-        <span class="fb-label">Teams & People</span>
-        <select>
-          <option>All — add teams / people…</option>
-        </select>
-        <span class="fb-label">Without</span>
-        <select>
-          <option>None — exclude…</option>
-        </select>
-        <div class="filter-sep"></div>
-        <button class="export-btn">↓ Export CSV</button>
-      </div>
-
       <div class="main">
         <div class="stat-bar">
           <div class="stat">
@@ -1030,7 +1043,7 @@
             <div class="card-sub">MTD aggregated by team</div>
             <canvas id="clTeamChart" height="160"></canvas>
           </div>
-          <div class="card" style="margin: 0">
+          <div class="card" style="margin: 0; display: none">
             <div class="card-title">🤖 Tokens by Model</div>
             <div class="card-sub">Token distribution across models</div>
 
@@ -1059,6 +1072,25 @@
               ></div>
             </div>
           </div>
+        </div>
+
+        <div class="filter-bar">
+          <span class="fb-label">Source</span>
+          <select>
+            <option>All sources</option>
+          </select>
+          <span class="fb-label">Teams & People</span>
+          <select>
+            <option>All — add teams / people…</option>
+          </select>
+          <span class="fb-label">Without</span>
+          <select>
+            <option>None — exclude…</option>
+          </select>
+          <div class="filter-sep"></div>
+          <button onclick="exportToCSVClaude()" class="export-btn">
+            ↓ Export CSV
+          </button>
         </div>
 
         <div class="tcard">
@@ -1091,44 +1123,10 @@
 
     <!-- ═══════════════════════════════ COPILOT ═══════════════════════════════ -->
     <div id="page-copilot" class="page">
-      <div class="filter-bar">
-        <span class="fb-label">Activity</span>
-        <div class="act-tabs">
-          <button class="act-tab active" onclick="filterSeats('all',this)">
-            All
-          </button>
-          <button class="act-tab" onclick="filterSeats('active',this)">
-            Active
-          </button>
-          <button class="act-tab" onclick="filterSeats('inactive',this)">
-            Inactive
-          </button>
-          <button class="act-tab" onclick="filterSeats('unmapped',this)">
-            Unmapped
-          </button>
-        </div>
-        <span class="fb-label" style="margin-left: 8px">Team</span>
-        <select id="cpTeamFilter" onchange="filterSeats('current',null)">
-          <option value="">All teams</option>
-          <option>SaaS Squad</option>
-          <option>Data Delivery Engineering</option>
-          <option>Platform Engineering</option>
-          <option>Sales</option>
-          <option>Engineering Ecosystem Squad</option>
-          <option>Antiban Squad</option>
-          <option>Infrastructure</option>
-          <option>Quality Assurance</option>
-          <option>Core Squad</option>
-          <option>Unassigned</option>
-        </select>
-        <div class="filter-sep"></div>
-        <button class="export-btn">↓ Export CSV</button>
-      </div>
-
       <div class="main">
         <!-- Savings banner -->
         <div class="savings-bar">
-          <div class="savings-metric">
+          <div class="savings-metric" style="display: none">
             <div class="savings-bar-title">
               💰 Estimated Developer Time Saved
             </div>
@@ -1146,7 +1144,7 @@
             </div>
           </div>
 
-          <div class="savings-metric">
+          <div class="savings-metric" style="display: none">
             <div class="savings-bar-title">📈 Accept Rate Trend</div>
             <div class="savings-bar-value" id="hero-accept-val">—% ↑</div>
             <div class="savings-bar-sub" id="hero-accept-sub">
@@ -1154,7 +1152,7 @@
             </div>
           </div>
 
-          <div class="savings-metric">
+          <div class="savings-metric" style="display: none">
             <div class="savings-bar-title">♻️ Reclaimable This Month</div>
             <div class="savings-bar-value" id="hero-reclaim-val">$—/mo</div>
             <div class="savings-bar-sub" id="hero-reclaim-sub">
@@ -1174,14 +1172,11 @@
           <!-- Active Seats -->
           <div class="stat">
             <div class="stat-label">Active (30D)</div>
+
             <div class="stat-value">
-              <span id="cp-active-seats">—</span>
-              <span
-                style="font-size: 14px; color: var(--muted)"
-                id="cp-total-for-active"
-                >/—</span
-              >
+              <span id="cp-active-seats"></span>
             </div>
+
             <div class="stat-sub">used in last 30 days</div>
           </div>
           <!-- Inactive Seats -->
@@ -1199,14 +1194,14 @@
               Costing —
             </div>
           </div>
-          <!-- Monthly Cost -->
+          <!-- Total Cost -->
           <div class="stat">
-            <div class="stat-label">Monthly Cost</div>
+            <div class="stat-label">Current Month Spend</div>
             <div class="stat-value" id="cp-monthly-cost">—</div>
             <div class="stat-sub" id="cp-annual-cost">— / yr</div>
           </div>
           <!-- Reclaimable -->
-          <div class="stat">
+          <div class="stat" style="display: none">
             <div class="stat-label">Reclaimable / Mo</div>
             <div
               class="stat-value"
@@ -1253,21 +1248,97 @@
         </div>
 
         <!-- 3-col top panels -->
-        <div class="grid-3">
-          <div class="card" style="margin: 0">
+        <div class="grid-3" style="align-items: stretch">
+          <div
+            class="card"
+            style="
+              margin: 0;
+              display: flex;
+              flex-direction: column;
+              max-height: 400px;
+            "
+          >
+            <div class="card-title">High Spending Members</div>
+            <!-- <div class="card-sub">High Spending Members</div> -->
+            <div
+              class="scrollable-list"
+              style="
+                flex: 1;
+                overflow-y: auto;
+                padding-right: 5px;
+                /* margin-top: 10px; */
+                min-height: 0;
+              "
+            >
+              <!-- Critical Users -->
+              <div id="critical-dollars-list">
+                <div
+                  style="
+                    padding: 10px;
+                    text-align: center;
+                    color: #94a3b8;
+                    font-size: 12px;
+                    background: #f8fafc;
+                    border-radius: 6px;
+                    border: 1px dashed #cbd5e1;
+                  "
+                >
+                  Calculating...
+                </div>
+              </div>
+              <!-- Approaching Label -->
+              <!-- <div
+                class="card-sub"
+                style="
+                  margin-top: 20px;
+                  font-size: 11px;
+                  font-weight: 600;
+                  text-transform: uppercase;
+                  letter-spacing: 0.5px;
+                "
+              >
+                Notable Spenders
+              </div> -->
+              <!-- Approaching Users -->
+              <div id="approaching-dollars-list" style="margin-top: 10px">
+                <!-- Filled by JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Card 2: Inactive Seats -->
+          <div
+            class="card"
+            style="margin: 0; display: flex; flex-direction: column"
+          >
             <div class="card-title">♻️ Inactive Seats — Reclaimable</div>
             <div class="card-sub">No activity in 30+ days · $19/seat/mo</div>
-            <div id="cp-reclaim"></div>
+            <div
+              id="cp-reclaim"
+              style="flex: 1; overflow-y: auto; min-height: 0; margin-top: 10px"
+            ></div>
           </div>
-          <div class="card" style="margin: 0; display: none">
+
+          <!-- Card 3: Cost by Team (hidden) -->
+          <!-- <div class="card" style="margin: 0; display: none">
             <div class="card-title">💰 Cost by Team</div>
             <div class="card-sub">Monthly seat cost per team</div>
             <canvas id="cpTeamChart" height="230"></canvas>
-          </div>
-          <div class="card" style="margin: 0">
+          </div> -->
+
+          <!-- Card 4: Active Seats by Editor -->
+          <div
+            class="card"
+            style="margin: 0; display: flex; flex-direction: column"
+          >
             <div class="card-title">🖥️ Active Seats by Editor</div>
             <div class="card-sub">Editor version breakdown</div>
-            <canvas id="cpEditorChart" height="230"></canvas>
+            <div style="flex: 1; position: relative; min-height: 200px">
+              <canvas
+                id="cpEditorChart"
+                style="width: 100%; height: 100%"
+              ></canvas>
+            </div>
           </div>
         </div>
 
@@ -1309,12 +1380,63 @@
             <div class="card-sub">AI-written code merged by your team</div>
             <canvas id="cpLinesChart" height="160"></canvas>
           </div>
+          <div class="card" style="margin: 0">
+            <!-- <div class="card-title">Top Orgs Spend</div> -->
+            <div id="org-spend-subtitle" class="card-sub"></div>
+
+            <div
+              style="
+                position: relative;
+                height: 250px;
+                width: 100%;
+                display: block;
+              "
+            >
+              <canvas id="orgSpendChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-bar">
+          <span class="fb-label">Activity</span>
+          <div class="act-tabs">
+            <button class="act-tab active" onclick="filterSeats('all',this)">
+              All
+            </button>
+            <button class="act-tab" onclick="filterSeats('active',this)">
+              Active
+            </button>
+            <button class="act-tab" onclick="filterSeats('inactive',this)">
+              Inactive
+            </button>
+            <button class="act-tab" onclick="filterSeats('unmapped',this)">
+              Unmapped
+            </button>
+          </div>
+          <span class="fb-label" style="margin-left: 8px">Team</span>
+          <select id="cpTeamFilter" onchange="filterSeats('current',null)">
+            <option value="">All teams</option>
+            <option>SaaS Squad</option>
+            <option>Data Delivery Engineering</option>
+            <option>Platform Engineering</option>
+            <option>Sales</option>
+            <option>Engineering Ecosystem Squad</option>
+            <option>Antiban Squad</option>
+            <option>Infrastructure</option>
+            <option>Quality Assurance</option>
+            <option>Core Squad</option>
+            <option>Unassigned</option>
+          </select>
+          <div class="filter-sep"></div>
+          <button onclick="exportToCSVCopilot()" class="export-btn">
+            ↓ Export CSV
+          </button>
         </div>
 
         <!-- Seats table -->
         <div class="tcard">
           <div class="tcard-head">
-            <h3 id="seats-count">Seats (163)</h3>
+            <h3 id="seats-count">Seats</h3>
             <input
               class="search-box"
               placeholder="🔍 Search users…"
@@ -1324,13 +1446,41 @@
           <table>
             <thead>
               <tr>
-                <th>Name</th>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('displayName')"
+                >
+                  Name ↕
+                </th>
                 <th>GitHub</th>
                 <th>Team</th>
                 <th>Activity</th>
-                <th>Last Activity</th>
-                <th>Editor</th>
-                <th>Cost</th>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('cleanTimestamp')"
+                >
+                  Last Activity ↕
+                </th>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('cleanEditor')"
+                >
+                  Editor ↕
+                </th>
+                <th
+                  id="th-net-credit"
+                  style="cursor: pointer"
+                  onclick="sortCp('netCredits')"
+                >
+                  AI CREDIT ↕
+                </th>
+                <th
+                  id="th-net-amount"
+                  style="cursor: pointer"
+                  onclick="sortCp('netAmount')"
+                >
+                  AMOUNT ↕
+                </th>
               </tr>
             </thead>
             <tbody id="cp-tbody"></tbody>

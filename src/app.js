@@ -43,6 +43,7 @@ app.get("/api/dashboard-data", async (req, res) => {
       claude_seats: claudeData.claude_seats || [],
       copilot: copilotData.copilot || [],
       copilot_seats: copilotData.copilot_seats || [],
+      org_ai_credits: copilotData.org_ai_credits || {},
     };
 
     // Store log entry (Ensure 'logger' is available globally or imported)

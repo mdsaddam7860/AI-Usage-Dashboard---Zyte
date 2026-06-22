@@ -15,6 +15,107 @@ let cpTeamCost = []; // New: For Copilot Team chart
 let cpEditorData = []; // New: For Editor chart
 let cpDays = []; // New: For lines/acceptances charts
 
+function exportToCSVCopilot() {
+  // 1. Get the current data being shown in the table
+  const data = currentCpSeats;
+  if (!data || data.length === 0) return;
+
+  // 2. Define the columns we want in our CSV
+  const headers = [
+    "Name",
+    "GitHub",
+    "Team",
+    "Activity",
+    "Last Activity",
+    "Editor",
+    "Net Credits",
+    "Net Amount",
+  ];
+
+  // 3. Convert data to CSV rows
+  const csvRows = [headers.join(",")]; // Add header row
+
+  for (const row of data) {
+    const values = [
+      row.displayName,
+      row.github || "—",
+      row.team,
+      row.activity,
+      row.rawDate || "—",
+      row.cleanEditor || "—",
+      row.netCredits,
+      row.netAmount,
+    ];
+    csvRows.push(values.join(","));
+  }
+
+  // 4. Create a Blob and trigger the download
+  const csvString = csvRows.join("\n");
+  const blob = new Blob([csvString], { type: "text/csv" });
+  const url = window.URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.setAttribute("href", url);
+  a.setAttribute("download", "copilot_seats_report.csv");
+  a.click();
+}
+function exportToCSVClaude() {
+  const data = clMembers;
+  if (!data || data.length === 0) return;
+
+  const headers = [
+    "Name",
+    "Email",
+    "Team",
+    "MTD Spend",
+    "Requests",
+    "Cost/Req",
+    "Cap",
+    "Util %",
+  ];
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return '""';
+    return `"${String(val).replace(/"/g, '""')}"`;
+  };
+
+  const csvRows = [headers.map(escapeCSV).join(",")];
+
+  for (const row of data) {
+    const costPerReq =
+      row.requests > 0 ? (row.spend / row.requests).toFixed(3) : 0;
+
+    const values = [
+      row.name,
+      row.email,
+      row.team,
+      Number(row.spend).toFixed(2),
+      row.requests,
+      costPerReq,
+      Number(row.cap).toFixed(2),
+      `${row.util}%`,
+    ];
+
+    csvRows.push(values.map(escapeCSV).join(","));
+  }
+
+  const csvString = "\uFEFF" + csvRows.join("\n");
+  const blob = new Blob([csvString], {
+    type: "text/csv;charset=utf-8;",
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `claude_members_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+
+  URL.revokeObjectURL(url);
+}
+
 // Helper to update elements safely without crashing
 function safeUpdate(id, value) {
   const el = document.getElementById(id);
@@ -29,10 +130,25 @@ function safeUpdate(id, value) {
 // ─────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 const charts = {};
-function mk(id, cfg) {
-  if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart($(id), cfg);
+// Find your existing mk() function (around script.js:34) and replace it with this:
+function mk(canvasId, config) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+
+  // Destroy via window registry (same pattern as drawChart in updateCopilotDashboard)
+  if (window[canvasId + "Instance"]) {
+    window[canvasId + "Instance"].destroy();
+    window[canvasId + "Instance"] = null;
+  }
+
+  // Also catch any orphaned Chart.js instance not in the registry
+  const existing = Chart.getChart(ctx);
+  if (existing) existing.destroy();
+
+  window[canvasId + "Instance"] = new Chart(ctx, config);
+  return window[canvasId + "Instance"];
 }
+
 const fmt = (n) =>
   "$" +
   Number(n).toLocaleString(undefined, {
@@ -353,6 +469,97 @@ cpDays = Array.from({ length: 28 }, (_, i) => {
 let cpActivityFilter = "all";
 let cpSearchFilter = "";
 
+// function filterSeats(filter, btn) {
+//   if (filter !== "current") cpActivityFilter = filter;
+//   if (btn) {
+//     document
+//       .querySelectorAll(".act-tab")
+//       .forEach((x) => x.classList.remove("active"));
+//     btn.classList.add("active");
+//   }
+//   const team = $("cpTeamFilter").value;
+//   let rows = [...cpSeatsData];
+//   if (cpActivityFilter === "active")
+//     rows = rows.filter((r) => r.activity === "active");
+//   else if (cpActivityFilter === "inactive")
+//     rows = rows.filter((r) => r.activity === "inactive");
+//   else if (cpActivityFilter === "unmapped")
+//     rows = rows.filter((r) => r.unmapped);
+//   if (team) rows = rows.filter((r) => r.team === team);
+//   if (cpSearchFilter)
+//     rows = rows.filter(
+//       (r) =>
+//         r.name.toLowerCase().includes(cpSearchFilter) ||
+//         r.github.toLowerCase().includes(cpSearchFilter) ||
+//         r.team.toLowerCase().includes(cpSearchFilter)
+//     );
+//   $("seats-count").textContent = `Seats (${rows.length})`;
+//   $("cp-tbody").innerHTML = rows
+//     .map((r) => {
+//       const burnPct =
+//         r.limit_usd > 0
+//           ? Math.min(Math.round((r.spend_usd / r.limit_usd) * 100), 100)
+//           : 0;
+//       const burnColor =
+//         burnPct >= 90 ? "#ef4444" : burnPct >= 60 ? "#f59e0b" : "#10b981";
+
+//       return `<tr>
+//       <td>
+//         <span class="dot ${r.activity}"></span>
+//         <strong>${r.name}</strong>
+//         ${r.unmapped ? '<span class="tag unmapped">UNMAPPED</span>' : ""}
+//       </td>
+//       <td style="color:var(--muted);font-size:12px">${r.github}</td>
+//       <td style="font-size:12px">${r.team}</td>
+//       <td>
+//         <span class="badge ${r.activity}">
+//           ${r.activity === "active" ? "Active" : "Inactive"}
+//         </span>
+//       </td>
+//       <td style="color:var(--muted);font-size:12px">${r.last}</td>
+//       <td style="font-size:11px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${
+//         r.editor
+//       }">${r.editor}</td>
+//       <td><strong>$${(r.cost || 0).toFixed(2)}</strong></td>
+//       <td style="font-size:12px">$${(r.spend_usd || 0).toFixed(2)}</td>
+//       <td style="font-size:12px;color:${
+//         r.remaining_usd > 0 ? "#10b981" : "var(--muted)"
+//       }">
+//         $${(r.remaining_usd || 0).toFixed(2)}
+//       </td>
+//       <td>
+//         <div style="display:flex;align-items:center;gap:6px;min-width:90px;">
+//           <div style="flex:1;background:#e2e8f0;border-radius:99px;height:6px;">
+//             <div style="width:${burnPct}%;background:${burnColor};height:6px;border-radius:99px;transition:width 0.3s;"></div>
+//           </div>
+//           <span style="font-size:11px;color:${burnColor};font-weight:600;white-space:nowrap;">${burnPct}%</span>
+//         </div>
+//       </td>
+//     </tr>`;
+//     })
+//     .join("");
+// }
+function formatEditorName(editorRaw) {
+  if (!editorRaw || editorRaw === "—") return "—";
+
+  const str = editorRaw.toLowerCase();
+
+  // Map common telemetry strings to clean names
+  if (str.includes("vscode")) return "VS Code";
+  if (str.includes("visualstudio")) return "Visual Studio";
+  if (str.includes("jetbrains")) return "JetBrains";
+  if (str.includes("githubcopilotchat")) return "Copilot Chat";
+  if (str.includes("copilot-developer")) return "Copilot Developer";
+
+  // Fallback: If it looks like 'unknown/SomeEditor/1.0', extract 'SomeEditor'
+  const parts = editorRaw.split("/");
+  if (parts[0] === "unknown" && parts.length > 1) {
+    return parts[1];
+  }
+
+  // Return original if no rules match
+  return editorRaw;
+}
 function filterSeats(filter, btn) {
   if (filter !== "current") cpActivityFilter = filter;
   if (btn) {
@@ -361,15 +568,19 @@ function filterSeats(filter, btn) {
       .forEach((x) => x.classList.remove("active"));
     btn.classList.add("active");
   }
+
   const team = $("cpTeamFilter").value;
   let rows = [...cpSeatsData];
+
   if (cpActivityFilter === "active")
     rows = rows.filter((r) => r.activity === "active");
   else if (cpActivityFilter === "inactive")
     rows = rows.filter((r) => r.activity === "inactive");
   else if (cpActivityFilter === "unmapped")
     rows = rows.filter((r) => r.unmapped);
+
   if (team) rows = rows.filter((r) => r.team === team);
+
   if (cpSearchFilter)
     rows = rows.filter(
       (r) =>
@@ -377,31 +588,178 @@ function filterSeats(filter, btn) {
         r.github.toLowerCase().includes(cpSearchFilter) ||
         r.team.toLowerCase().includes(cpSearchFilter)
     );
-  $("seats-count").textContent = `Seats (${rows.length})`;
-  $("cp-tbody").innerHTML = rows
-    .map(
-      (r) => `<tr>
-    <td><span class="dot ${r.activity}"></span><strong>${r.name}</strong>${
-        r.unmapped ? '<span class="tag unmapped">UNMAPPED</span>' : ""
-      }</td>
-    <td style="color:var(--muted);font-size:12px">${r.github}</td>
-    <td style="font-size:12px">${r.team}</td>
-    <td><span class="badge ${r.activity}">${
-        r.activity === "active" ? "Active" : "Inactive"
-      }</span></td>
-    <td style="color:var(--muted);font-size:12px">${r.last}</td>
-    <td style="font-size:11px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${
-      r.editor
-    }">${r.editor}</td>
-    <td><strong>$${r.cost}</strong></td>
-  </tr>`
-    )
-    .join("");
-}
 
+  $("seats-count").textContent = `Seats (${rows.length})`;
+
+  $("cp-tbody").innerHTML = rows
+    .map((r) => {
+      // ── Extract new data fields, defaulting to 0 if missing ────────────────
+      const grossCredits = parseFloat(r.gross_credits || 0);
+      const grossAmount = parseFloat(r.gross_amount || 0);
+      const netCredits = parseFloat(r.net_credits || 0);
+      const netAmount = parseFloat(r.net_amount || 0);
+      const editor = formatEditorName(r.editor);
+      const discountAmount = parseFloat(r.discount_amount || 0);
+      const discountQuantity = parseFloat(r.discount_quantity || 0) * 100;
+
+      // ── Render 10 columns matching your updated <thead> ────────────────────
+      return `<tr>
+        <td>
+          <span class="dot ${r.activity}"></span>
+          <strong>${r.name || r.user || "—"}</strong>
+          ${r.unmapped ? '<span class="tag unmapped">UNMAPPED</span>' : ""}
+        </td>
+        <td style="color:var(--muted);font-size:12px">${r.github || "—"}</td>
+        <td style="font-size:12px">${r.team || "—"}</td>
+        <td>
+          <span class="badge ${r.activity}">
+            ${r.activity === "active" ? "Active" : "Inactive"}
+          </span>
+        </td>
+        <td style="color:var(--muted);font-size:12px">${r.last || "—"}</td>
+        <td style="font-size:11px;color:var(--muted);max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${
+          editor || ""
+        }">${editor || "—"}</td>
+        
+        
+        <td>${netCredits.toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        })}</td>
+        <td style="color:#10b981;font-weight:500;">$${netAmount.toFixed(2)}</td>
+
+        
+        </tr>`;
+    })
+
+    /**!SECTION
+     * <td>${grossCredits.toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        })}</td>
+        <td style="color:#8b5cf6;font-weight:500;">$${grossAmount.toFixed(
+          2
+        )}</td>
+     */
+    .join("");
+  // <td>${discountQuantity.toLocaleString(undefined, {
+  //   maximumFractionDigits: 2,
+  // })}</td>
+  // <td style="color:#10b981;font-weight:500;">$${discountAmount.toFixed(2)}
+  // </td>
+}
 function filterCpSearch(v) {
   cpSearchFilter = v.toLowerCase();
   filterSeats("current", null);
+}
+// 1. Global State for Copilot Sorting
+let cpSort = { key: "netAmount", asc: false }; // Ensure this defaults to netAmount, descending
+let currentCpSeats = [];
+
+// 2. The Global Sort Function triggered by HTML onclick
+window.sortCp = function (key) {
+  if (cpSort.key === key) {
+    cpSort.asc = !cpSort.asc;
+  } else {
+    cpSort.key = key;
+    cpSort.asc = false;
+  }
+  renderCpTable(); // Redraw the table
+};
+
+// 3. The Reusable Table Render Function
+function renderCpTable() {
+  const tbody = document.getElementById("cp-tbody");
+  if (!tbody) return;
+
+  console.log("CurrentCPSeats", currentCpSeats);
+
+  // ── 1. Sort the global array based on current state ──────────────────────
+  const tableSeats = [...currentCpSeats].sort((a, b) => {
+    // Grab the values, fallback to displayName if HTML passed 'name'
+    let valA = cpSort.key === "name" ? a.displayName : a[cpSort.key];
+    let valB = cpSort.key === "name" ? b.displayName : b[cpSort.key];
+
+    // Handle Text (String) Sorting
+    if (typeof valA === "string" || typeof valB === "string") {
+      const strA = String(valA || "").toLowerCase();
+      const strB = String(valB || "").toLowerCase();
+      return cpSort.asc ? strA.localeCompare(strB) : strB.localeCompare(strA);
+    }
+
+    // Handle Number Sorting (Credits, Amounts, cleanTimestamps)
+    return cpSort.asc ? (valA || 0) - (valB || 0) : (valB || 0) - (valA || 0);
+  });
+
+  // ── 2. Render the Rows ───────────────────────────────────────────────────
+  let tableHtml = "";
+  console.log("tableSeats:", tableSeats); // This one is perfectly fine!
+
+  tableSeats.forEach((seat) => {
+    // 1. Get raw date
+    const rawDate = seat.last_activity || seat.last;
+
+    // 2. Format safely
+    let lastActivityDate = "—";
+    if (rawDate && rawDate !== "Never" && rawDate !== "—") {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        // Check if valid
+        lastActivityDate = d.toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        });
+      }
+    }
+
+    // 3. Editor (Use the global helper we built)
+    let displayEditor = getCleanEditorName(seat.last_editor || seat.editor);
+    // Activity Badge
+    const isActive = seat.activity === "active";
+    const activityBadge = isActive
+      ? `<span style="background:#dcfce7;color:#166534;padding:4px 8px;border-radius:12px;font-size:11px;font-weight:600;">Active</span>`
+      : `<span style="background:#f1f5f9;color:#64748b;padding:4px 8px;border-radius:12px;font-size:11px;font-weight:600;">Inactive</span>`;
+
+    // 4. Build row
+    tableHtml += `
+    <tr style="border-bottom: 1px solid #f1f5f9;">
+      <td style="padding: 12px;"><strong>${seat.displayName}</strong></td>
+      <td style="padding: 12px; color: #64748b;">${
+        seat.user || seat.github || "—"
+      }</td>
+      <td style="padding: 12px;">${seat.team}</td>
+      <td style="padding: 12px;">${activityBadge}</td>
+      <td style="padding: 12px;">${lastActivityDate}</td>
+      <td style="padding: 12px;">${displayEditor}</td>
+      <td style="padding: 12px; font-weight: 500;">${seat.netCredits.toLocaleString(
+        undefined,
+        { maximumFractionDigits: 0 }
+      )}</td>
+      <td style="padding: 12px; color: #10b981; font-weight: 600;">$${seat.netAmount.toFixed(
+        2
+      )}</td>
+    </tr>`;
+  });
+
+  tbody.innerHTML =
+    tableHtml ||
+    `<tr><td colspan="8" style="text-align:center;">No Copilot seat data available</td></tr>`;
+
+  // ── 3. Update arrows in the UI ───────────────────────────────────────────
+  const thCredit = document.getElementById("th-net-credit");
+  const thAmount = document.getElementById("th-net-amount");
+
+  if (thCredit) {
+    // CHANGE 'AI CREDIT' TO MATCH YOUR NEW LABEL
+    thCredit.innerHTML = `AI CREDIT ${
+      cpSort.key === "netCredits" ? (cpSort.asc ? "↑" : "↓") : "↕"
+    }`;
+  }
+  if (thAmount) {
+    // CHANGE 'AMOUNT' TO MATCH YOUR NEW LABEL
+    thAmount.innerHTML = `AMOUNT ${
+      cpSort.key === "netAmount" ? (cpSort.asc ? "↑" : "↓") : "↕"
+    }`;
+  }
 }
 
 function renderCopilot() {
@@ -506,20 +864,50 @@ function renderCopilot() {
   });
 
   // --- 7. Active Seats by Editor Chart ---
+
+  // Helper function to clean up messy telemetry strings
+  const normalizeEditorName = (raw) => {
+    if (!raw || typeof raw !== "string") return "Unknown";
+    const r = raw.toLowerCase();
+
+    if (r.includes("vscode") || r.includes("visual studio code"))
+      return "VS Code";
+    if (r.includes("intellij")) return "IntelliJ IDEA";
+    if (r.includes("visualstudio") && !r.includes("code"))
+      return "Visual Studio";
+    if (r.includes("neovim")) return "Neovim";
+    if (r.includes("vim")) return "Vim";
+    if (r.includes("jetbrains")) return "JetBrains";
+    if (
+      r.includes("githubcopilotchat") ||
+      r.includes("copilot-developer") ||
+      r.includes("copilot_pr_review")
+    )
+      return "Copilot Chat";
+
+    const parts = raw.split("/");
+    if (parts[0] === "unknown" && parts.length > 1) return parts[1];
+    if (r.includes("unknown")) return "Unknown";
+
+    return raw.split("/")[0].replace(/^\w/, (c) => c.toUpperCase());
+  };
+
   // Filter to only active users, and count their editors
   const activeSeats = cpSeatsData.filter((s) => s.activity === "active");
   const editorMap = {};
 
   activeSeats.forEach((s) => {
-    // If the editor is missing, group it under "Unknown"
-    let editorName = s.editor && s.editor !== "—" ? s.editor : "Unknown";
+    // Grab the most recent editor string available
+    let rawEditor =
+      s.last_editor && s.last_editor !== "—" ? s.last_editor : s.editor;
 
-    // Optional: If you want cleaner labels, you can split the long strings
-    // like "vscode/1.95.3/copilot" into just "vscode (1.95.3)"
-    // let parts = editorName.split('/');
-    // if(parts.length > 1) editorName = `${parts[0]} (${parts[1]})`;
+    // Pass it through our cleaner function
+    let cleanEditorName = normalizeEditorName(rawEditor);
 
-    editorMap[editorName] = (editorMap[editorName] || 0) + 1;
+    // Group it (ignoring the unknowns for a cleaner chart)
+    if (cleanEditorName !== "Unknown") {
+      editorMap[cleanEditorName] = (editorMap[cleanEditorName] || 0) + 1;
+    }
   });
 
   // Sort editors from most used to least used, and take the top 6
@@ -546,14 +934,14 @@ function renderCopilot() {
       responsive: true,
       plugins: {
         legend: {
-          position: "right", // Put the legend on the right so versions are readable
+          position: "right",
           labels: { color: "#8a8a9a", font: { size: 10 }, boxWidth: 12 },
         },
       },
     },
   });
 }
-// renderCopilot();
+renderCopilot();
 
 // Function to update dashboard data asynchronously without changing pages
 // ─────────────────────────────────────────────────────
@@ -673,45 +1061,531 @@ function updateClaudeDashboard(clMembers) {
   set("tab-count-cl", `${clMembers.length} members`);
 }
 // We MUST accept both cpRows (the event data) AND cpSeatsData (the billing/seat data)
+// function updateCopilotDashboard(cpRows, cpSeatsData) {
+//   if (!cpSeatsData || cpSeatsData.length === 0) return;
+//   if (!cpRows) cpRows = [];
+
+//   // ============ DEBUG START ============
+//   console.log("=== updateCopilotDashboard DEBUG ===");
+//   console.log("cpSeatsData count:", cpSeatsData.length);
+//   console.log("cpRows count:", cpRows.length);
+
+//   const set = (id, val) => {
+//     const el = document.getElementById(id);
+//     if (el) el.textContent = val;
+//   };
+
+//   // --- 1. SEAT DATA CALCULATIONS (Billing & High-Level) ---
+//   const activeSeats = cpSeatsData.filter((s) => s.activity === "active");
+//   const inactive = cpSeatsData.filter((s) => s.activity === "inactive");
+//   const monthlyCost = cpSeatsData.reduce(
+//     (sum, s) => sum + (s.cost || s.limit_usd || 0),
+//     0
+//   );
+//   const reclaimableCost = inactive.reduce(
+//     (sum, s) => sum + (s.cost || s.limit_usd || 0),
+//     0
+//   );
+//   const neverUsedCount = cpSeatsData.filter(
+//     (s) => s.last === "Never" || (s.spend_usd || 0) === 0
+//   ).length;
+
+//   // Check what keys are actually on seat objects
+//   if (cpSeatsData.length > 0) {
+//     console.log("Sample seat keys:", Object.keys(cpSeatsData[0]));
+//     console.log("Sample seat object:", cpSeatsData[0]);
+//     console.log("editor field:", cpSeatsData[0].editor);
+//     console.log("last_editor field:", cpSeatsData[0].last_editor);
+//     console.log("user field:", cpSeatsData[0].user);
+//   }
+
+//   // Check what keys are on row objects
+//   if (cpRows.length > 0) {
+//     console.log("Sample row keys:", Object.keys(cpRows[0]));
+//     console.log("Sample row object:", cpRows[0]);
+//     console.log("row.editor:", cpRows[0].editor);
+//     console.log("row.last_editor:", cpRows[0].last_editor);
+//     console.log("row.user:", cpRows[0].user);
+//   }
+
+//   // --- 2. MAP USERS TO EDITORS (Fix for "Unknown" Editor) ---
+//   const normalizeEditor = (raw) => {
+//     if (!raw) return "Unknown";
+//     const r = raw.toLowerCase();
+//     if (r.includes("vscode") || r.includes("visual studio code"))
+//       return "VS Code";
+//     if (r.includes("intellij")) return "IntelliJ IDEA";
+//     if (r.includes("visualstudio") && !r.includes("code"))
+//       return "Visual Studio";
+//     if (r.includes("neovim")) return "Neovim";
+//     if (r.includes("vim")) return "Vim";
+//     if (r.includes("jetbrains")) return "JetBrains";
+//     if (
+//       r.includes("githubcopilotchat") ||
+//       r.includes("copilot-developer") ||
+//       r.includes("copilot_pr_review")
+//     )
+//       return "GitHub Web/Chat";
+//     if (r.includes("unknown")) return "Unknown";
+//     // Fallback: capitalize first segment before "/"
+//     return raw.split("/")[0].replace(/^\w/, (c) => c.toUpperCase());
+//   };
+
+//   const userToEditorMap = {};
+//   cpSeatsData.forEach((s) => {
+//     if (s.user && (s.last_editor || s.editor)) {
+//       const normalized = normalizeEditor(s.last_editor || s.editor);
+//       if (normalized !== "Unknown") {
+//         userToEditorMap[s.user] = normalized;
+//       }
+//     }
+//   });
+
+//   // --- 3. ROW DATA CALCULATIONS (Usage & Interactions) ---
+//   let langStats = {};
+//   let editorStats = {};
+//   let teamAcceptanceStats = {};
+//   let totalLinesAccepted = 0;
+//   let activeUsersSet = new Set();
+
+//   // Track daily numbers for the bottom charts
+//   let dailyStats = {};
+
+//   if (cpRows && cpRows.length > 0) {
+//     cpRows.forEach((r) => {
+//       // Top Language
+//       let lang = r.language || "Unknown";
+//       if (lang === "typescript") lang = "TypeScript";
+//       else if (lang === "javascript") lang = "JavaScript";
+//       else if (lang === "python") lang = "Python";
+//       else if (lang !== "Unknown")
+//         lang = lang.charAt(0).toUpperCase() + lang.slice(1);
+
+//       const activity = r.suggestions > 0 ? r.suggestions : r.chats || 0;
+//       if (activity > 0) langStats[lang] = (langStats[lang] || 0) + activity;
+
+//       // Dominant Editor (Using Map Fallback + normalizeEditor)
+//       let editor =
+//         userToEditorMap[r.user] || normalizeEditor(r.last_editor || r.editor);
+
+//       if (activity > 0) {
+//         // ONLY tally known editors to prevent "Unknown" from winning
+//         if (editor !== "Unknown") {
+//           editorStats[editor] = (editorStats[editor] || 0) + activity;
+//         }
+//         activeUsersSet.add(r.user);
+//       }
+
+//       // Team Acceptance Rates
+//       let team = r.team || "Unknown";
+//       if (!teamAcceptanceStats[team])
+//         teamAcceptanceStats[team] = { suggestions: 0, acceptances: 0 };
+//       teamAcceptanceStats[team].suggestions += r.suggestions || 0;
+//       teamAcceptanceStats[team].acceptances += r.acceptances || 0;
+
+//       // Lines Accepted
+//       totalLinesAccepted += r.lines_accepted || 0;
+
+//       // Daily Aggregation for Trend Charts
+//       if (r.date && r.date !== "unknown-date") {
+//         const d = new Date(r.date).toLocaleDateString("en-US", {
+//           month: "short",
+//           day: "numeric",
+//         });
+//         if (!dailyStats[d]) dailyStats[d] = { shown: 0, accepted: 0, lines: 0 };
+//         dailyStats[d].shown += r.suggestions || 0;
+//         dailyStats[d].accepted += r.acceptances || 0;
+//         dailyStats[d].lines += r.lines_accepted || 0;
+//       }
+//     });
+//   } else {
+//     // Fallback logic if row data is completely missing
+//     cpSeatsData.forEach((s) => {
+//       totalLinesAccepted += s.lines_accepted || 0;
+//       if (s.lines_accepted > 0) activeUsersSet.add(s.user);
+//     });
+//   }
+
+//   // --- 4. SORTING AND AGGREGATING WINNERS ---
+//   const sortedLangs = Object.entries(langStats).sort((a, b) => b[1] - a[1]);
+//   const sortedEditors = Object.entries(editorStats).sort((a, b) => b[1] - a[1]);
+//   // const sortedSeatEditors = Object.entries(seatEditorStats).sort(
+//   //   (a, b) => b[1] - a[1]
+//   // );
+
+//   const teamRates = Object.keys(teamAcceptanceStats)
+//     .map((t) => {
+//       const s = teamAcceptanceStats[t].suggestions;
+//       const rate = s > 0 ? (teamAcceptanceStats[t].acceptances / s) * 100 : 0;
+//       return { name: t, rate: rate, suggestions: s };
+//     })
+//     .filter((t) => t.suggestions > 50)
+//     .sort((a, b) => b.rate - a.rate);
+
+//   const avgLines =
+//     activeUsersSet.size > 0
+//       ? Math.round(totalLinesAccepted / activeUsersSet.size)
+//       : 0;
+//   // const hoursSaved = (totalLinesAccepted * 4) / 60;
+//   // const costSavings = hoursSaved * 75 - monthlyCost;
+
+//   // ROI Math
+//   const hoursSaved = (totalLinesAccepted * 4) / 60;
+//   const costSavings = hoursSaved * 75 - monthlyCost;
+
+//   // --- 5. INJECT DATA INTO UI ---
+//   set("hero-time-saved", `~${Math.round(hoursSaved).toLocaleString()} hrs/mo`);
+//   set("hero-cost-savings", `~$${Math.round(costSavings).toLocaleString()}/mo`);
+//   set("hero-reclaimable", `$${reclaimableCost.toLocaleString()}/mo`);
+
+//   if (sortedLangs.length > 0) {
+//     set("top-lang-val", sortedLangs[0][0]);
+//     set("top-lang-sub", `${sortedLangs[0][1].toLocaleString()} events`);
+//   }
+
+//   if (sortedEditors.length > 0) {
+//     set("dom-editor-val", sortedEditors[0][0]);
+//     set("dom-editor-sub", `${sortedEditors[0][1].toLocaleString()} events`);
+//   } else {
+//     set("dom-editor-val", "—");
+//     set("dom-editor-sub", "No data");
+//   }
+
+//   if (teamRates.length > 0) {
+//     const best = teamRates[0];
+//     const worst = teamRates[teamRates.length - 1];
+//     set("best-team-val", `${best.rate.toFixed(1)}%`);
+//     set("best-team-sub", best.name);
+//     set("worst-team-val", `${worst.rate.toFixed(1)}%`);
+//     set("worst-team-sub", worst.name);
+//   } else {
+//     set("best-team-val", "—");
+//     set("best-team-sub", "Not enough data");
+//     set("worst-team-val", "—");
+//     set("worst-team-sub", "Not enough data");
+//   }
+
+//   set("lines-user-val", avgLines.toLocaleString());
+//   set("lines-user-sub", "Avg per active user this month");
+
+//   set("never-used-val", neverUsedCount);
+//   set("never-used-sub", "Immediate reclaim candidates");
+
+//   const tabBadge = document.getElementById("tab-count-cp");
+//   if (tabBadge) tabBadge.textContent = `${cpSeatsData.length} seats`;
+
+//   // --- 6. RENDER ALL CHARTS ---
+//   const drawChart = (canvasId, config) => {
+//     const ctx = document.getElementById(canvasId);
+//     if (!ctx) return;
+//     if (window[canvasId + "Instance"]) window[canvasId + "Instance"].destroy();
+//     window[canvasId + "Instance"] = new Chart(ctx, config);
+//   };
+
+//   // Top Languages Chart (Restored to show ALL languages)
+//   if (sortedLangs.length > 0) {
+//     drawChart("cpLangChart", {
+//       type: "doughnut",
+//       data: {
+//         labels: sortedLangs.map((item) => item[0]),
+//         datasets: [
+//           {
+//             data: sortedLangs.map((item) => item[1]),
+//             // Expanded color palette for large datasets
+//             backgroundColor: [
+//               "#8b5cf6",
+//               "#3b82f6",
+//               "#10b981",
+//               "#f59e0b",
+//               "#ef4444",
+//               "#ec4899",
+//               "#64748b",
+//               "#0ea5e9",
+//               "#14b8a6",
+//               "#f97316",
+//               "#84cc16",
+//               "#a855f7",
+//               "#eab308",
+//               "#f43f5e",
+//               "#06b6d4",
+//               "#8b5cf6",
+//               "#3b82f6",
+//               "#10b981",
+//               "#f59e0b",
+//               "#ef4444",
+//             ],
+//             borderWidth: 0,
+//             hoverOffset: 6,
+//           },
+//         ],
+//       },
+//       options: {
+//         responsive: true,
+//         maintainAspectRatio: false,
+//         cutout: "75%",
+//         plugins: {
+//           legend: {
+//             position: "right", // This pushes the huge list to the side
+//             labels: {
+//               usePointStyle: true,
+//               boxWidth: 8,
+//               color: "#64748b",
+//               font: { size: 11 },
+//             },
+//           },
+//         },
+//       },
+//     });
+//   }
+
+//   // If cpRows had no editor data, build editorStats directly from seat data
+//   if (Object.keys(editorStats).length === 0 && cpSeatsData.length > 0) {
+//     cpSeatsData.forEach((s) => {
+//       const editor = normalizeEditor(s.last_editor || s.editor);
+//       if (editor !== "Unknown") {
+//         editorStats[editor] = (editorStats[editor] || 0) + 1;
+//       }
+//     });
+//   }
+
+//   // Re-sort after potential fallback population
+//   const finalSortedEditors = Object.entries(editorStats)
+//     .filter(([name]) => name !== "—" && name !== "Unknown") // ← add this
+//     .sort((a, b) => b[1] - a[1]);
+
+//   console.log("finalSortedEditors:", finalSortedEditors);
+//   console.log(
+//     "cpEditorChart canvas exists:",
+//     !!document.getElementById("cpEditorChart")
+//   );
+//   console.log(
+//     "cpEditorChart canvas:",
+//     document.getElementById("cpEditorChart")
+//   );
+
+//   // Active Editors (UNCOMMENTED AND FIXED)
+//   if (finalSortedEditors.length > 0) {
+//     drawChart("cpEditorChart", {
+//       type: "doughnut", // Changed to doughnut to match your screenshot
+//       data: {
+//         labels: finalSortedEditors.map((item) => item[0]),
+//         datasets: [
+//           {
+//             data: finalSortedEditors.map((item) => item[1]),
+//             // Nice color palette for the editors
+//             backgroundColor: [
+//               "#059669",
+//               "#d97706",
+//               "#2563eb",
+//               "#7c3aed",
+//               "#db2777",
+//               "#475569",
+//             ],
+//             borderWidth: 0,
+//             hoverOffset: 6,
+//           },
+//         ],
+//       },
+//       options: {
+//         responsive: true,
+//         maintainAspectRatio: false,
+//         cutout: "65%", // Creates the doughnut hole
+//         plugins: {
+//           legend: {
+//             position: "right", // Puts the legend on the right side
+//             labels: {
+//               usePointStyle: true,
+//               boxWidth: 8,
+//               color: "#64748b",
+//               font: { size: 11 },
+//             },
+//           },
+//         },
+//       },
+//     });
+//   }
+
+//   // Daily Trend Charts (Bottom row)
+//   const dates = Object.keys(dailyStats);
+//   if (dates.length > 0) {
+//     const shownData = dates.map((d) => dailyStats[d].shown);
+//     const acceptedData = dates.map((d) => dailyStats[d].accepted);
+//     const rateData = dates.map((d) =>
+//       dailyStats[d].shown > 0
+//         ? (dailyStats[d].accepted / dailyStats[d].shown) * 100
+//         : 0
+//     );
+//     const linesData = dates.map((d) => dailyStats[d].lines);
+
+//     drawChart("cpTrendChart", {
+//       type: "bar",
+//       data: {
+//         labels: dates,
+//         datasets: [
+//           {
+//             label: "Shown",
+//             data: shownData,
+//             backgroundColor: "#e2e8f0",
+//             borderRadius: 4,
+//           },
+//           {
+//             label: "Accepted",
+//             data: acceptedData,
+//             backgroundColor: "#8b5cf6",
+//             borderRadius: 4,
+//           },
+//         ],
+//       },
+//       options: {
+//         responsive: true,
+//         maintainAspectRatio: false,
+//         scales: { x: { stacked: true }, y: { stacked: false } },
+//       },
+//     });
+
+//     drawChart("cpRateChart", {
+//       type: "line",
+//       data: {
+//         labels: dates,
+//         datasets: [
+//           {
+//             label: "Accept Rate %",
+//             data: rateData,
+//             borderColor: "#3b82f6",
+//             backgroundColor: "rgba(59, 130, 246, 0.1)",
+//             fill: true,
+//             tension: 0.4,
+//           },
+//         ],
+//       },
+//       options: {
+//         responsive: true,
+//         maintainAspectRatio: false,
+//         scales: { y: { min: 0, max: 100 } },
+//       },
+//     });
+
+//     drawChart("cpLinesChart", {
+//       type: "line",
+//       data: {
+//         labels: dates,
+//         datasets: [
+//           {
+//             label: "Lines Accepted",
+//             data: linesData,
+//             borderColor: "#10b981",
+//             backgroundColor: "rgba(16, 185, 129, 0.1)",
+//             fill: true,
+//             tension: 0.4,
+//           },
+//         ],
+//       },
+//       options: { responsive: true, maintainAspectRatio: false },
+//     });
+//   }
+// }
+
+// Global Helper: Cleans messy editor telemetry strings
+function getCleanEditorName(raw) {
+  if (!raw || typeof raw !== "string" || raw === "—") return "Unknown";
+  const r = raw.toLowerCase();
+
+  // Catch common editors
+  if (r.includes("vscode") || r.includes("visual studio code"))
+    return "VS Code";
+  if (r.includes("intellij")) return "IntelliJ IDEA";
+  if (r.includes("visualstudio") && !r.includes("code")) return "Visual Studio";
+  if (r.includes("neovim")) return "Neovim";
+  if (r.includes("vim")) return "Vim";
+  if (r.includes("jetbrains")) return "JetBrains";
+  if (
+    r.includes("githubcopilotchat") ||
+    r.includes("copilot-developer") ||
+    r.includes("copilot_pr_review")
+  )
+    return "Copilot Chat";
+
+  // Fallback: If it says "unknown/EditorName/1.0", extract "EditorName"
+  const parts = raw.split("/");
+  if (parts[0] === "unknown" && parts.length > 1) return parts[1];
+
+  if (r.includes("unknown")) return "Unknown";
+
+  // Final Fallback: capitalize the first segment
+  return raw.split("/")[0].replace(/^\w/, (c) => c.toUpperCase());
+}
 function updateCopilotDashboard(cpRows, cpSeatsData) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
   if (!cpRows) cpRows = [];
+
+  // ============ DEBUG START ============
+  console.log("=== updateCopilotDashboard DEBUG ===");
+  console.log("cpSeatsData count:", cpSeatsData.length);
+  console.log("cpRows count:", cpRows.length);
 
   const set = (id, val) => {
     const el = document.getElementById(id);
     if (el) el.textContent = val;
   };
 
-  // --- 1. SEAT DATA CALCULATIONS (Billing & High-Level) ---
+  // --- 1. SEAT DATA CALCULATIONS (Now using NET AMOUNT) ---
   const activeSeats = cpSeatsData.filter((s) => s.activity === "active");
   const inactive = cpSeatsData.filter((s) => s.activity === "inactive");
+
   const monthlyCost = cpSeatsData.reduce(
-    (sum, s) => sum + (s.cost || s.limit_usd || 0),
+    (sum, s) => sum + parseFloat(s.net_amount || 0),
     0
   );
+
   const reclaimableCost = inactive.reduce(
-    (sum, s) => sum + (s.cost || s.limit_usd || 0),
+    (sum, s) => sum + parseFloat(s.net_amount || 0),
     0
   );
+
   const neverUsedCount = cpSeatsData.filter(
-    (s) => s.last === "Never" || (s.spend_usd || 0) === 0
+    (s) => s.last === "Never" || parseFloat(s.net_amount || 0) === 0
   ).length;
 
-  // --- 2. MAP USERS TO EDITORS (Fix for "Unknown" Editor) ---
+  // --- 2. MAP USERS TO EDITORS (Fixed Logic) ---
+  const normalizeEditor = (raw) => {
+    if (!raw || typeof raw !== "string") return "Unknown";
+    const r = raw.toLowerCase();
+
+    // Catch the messy telemetry strings properly
+    if (r.includes("vscode") || r.includes("visual studio code"))
+      return "VS Code";
+    if (r.includes("intellij")) return "IntelliJ IDEA";
+    if (r.includes("visualstudio") && !r.includes("code"))
+      return "Visual Studio";
+    if (r.includes("neovim")) return "Neovim";
+    if (r.includes("vim")) return "Vim";
+    if (r.includes("jetbrains")) return "JetBrains";
+    if (
+      r.includes("githubcopilotchat") ||
+      r.includes("copilot-developer") ||
+      r.includes("copilot_pr_review")
+    )
+      return "Copilot Chat";
+
+    // If it says "unknown/EditorName/1.0", extract "EditorName"
+    const parts = raw.split("/");
+    if (parts[0] === "unknown" && parts.length > 1) {
+      return parts[1];
+    }
+
+    if (r.includes("unknown")) return "Unknown";
+
+    // Fallback: capitalize first segment
+    return raw.split("/")[0].replace(/^\w/, (c) => c.toUpperCase());
+  };
+
   const userToEditorMap = {};
   cpSeatsData.forEach((s) => {
-    if (s.user && s.last_editor && s.last_editor.toLowerCase() !== "unknown") {
-      const raw = s.last_editor.toLowerCase();
-      if (raw.includes("vscode")) userToEditorMap[s.user] = "VS Code";
-      else if (raw.includes("intellij"))
-        userToEditorMap[s.user] = "IntelliJ IDEA";
-      else if (raw.includes("visualstudio"))
-        userToEditorMap[s.user] = "Visual Studio";
-      // Fallback for standardizing things like "eclipse/1.0"
-      else
-        userToEditorMap[s.user] = s.last_editor
-          .split("/")[0]
-          .replace(/^\w/, (c) => c.toUpperCase());
+    if (s.user && (s.last_editor || s.editor)) {
+      const normalized = getCleanEditorName(s.last_editor || s.editor); // <-- UPDATED HERE
+      if (normalized !== "Unknown") {
+        userToEditorMap[s.user] = normalized;
+      }
     }
   });
 
@@ -721,8 +1595,6 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
   let teamAcceptanceStats = {};
   let totalLinesAccepted = 0;
   let activeUsersSet = new Set();
-
-  // Track daily numbers for the bottom charts
   let dailyStats = {};
 
   if (cpRows && cpRows.length > 0) {
@@ -738,22 +1610,12 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
       const activity = r.suggestions > 0 ? r.suggestions : r.chats || 0;
       if (activity > 0) langStats[lang] = (langStats[lang] || 0) + activity;
 
-      // Dominant Editor (Using Map Fallback)
-      let rawEditor = userToEditorMap[r.user] || r.editor || "Unknown";
-      let editor = "Unknown";
-
-      if (rawEditor.toLowerCase().includes("vscode")) editor = "VS Code";
-      else if (rawEditor.toLowerCase().includes("intellij"))
-        editor = "IntelliJ IDEA";
-      else if (rawEditor.toLowerCase().includes("visualstudio"))
-        editor = "Visual Studio";
-      else if (rawEditor.toLowerCase() !== "unknown") {
-        editor = rawEditor.split("/")[0];
-        editor = editor.charAt(0).toUpperCase() + editor.slice(1);
-      }
+      // Dominant Editor
+      let editor =
+        userToEditorMap[r.user] ||
+        getCleanEditorName(r.last_editor || r.editor); // <-- UPDATED HERE
 
       if (activity > 0) {
-        // ONLY tally known editors to prevent "Unknown" from winning
         if (editor !== "Unknown") {
           editorStats[editor] = (editorStats[editor] || 0) + activity;
         }
@@ -790,9 +1652,24 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
     });
   }
 
+  // If cpRows had no editor data, build editorStats directly from seat data safely
+  let isSeatFallback = false;
+  if (Object.keys(editorStats).length === 0 && cpSeatsData.length > 0) {
+    isSeatFallback = true;
+    cpSeatsData.forEach((s) => {
+      const editor = normalizeEditor(s.last_editor || s.editor);
+      if (editor !== "Unknown") {
+        editorStats[editor] = (editorStats[editor] || 0) + 1; // Tallies by users instead of events
+      }
+    });
+  }
+
   // --- 4. SORTING AND AGGREGATING WINNERS ---
   const sortedLangs = Object.entries(langStats).sort((a, b) => b[1] - a[1]);
-  const sortedEditors = Object.entries(editorStats).sort((a, b) => b[1] - a[1]);
+
+  const finalSortedEditors = Object.entries(editorStats)
+    .filter(([name]) => name !== "—" && name !== "Unknown")
+    .sort((a, b) => b[1] - a[1]);
 
   const teamRates = Object.keys(teamAcceptanceStats)
     .map((t) => {
@@ -822,9 +1699,14 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
     set("top-lang-sub", `${sortedLangs[0][1].toLocaleString()} events`);
   }
 
-  if (sortedEditors.length > 0) {
-    set("dom-editor-val", sortedEditors[0][0]);
-    set("dom-editor-sub", `${sortedEditors[0][1].toLocaleString()} events`);
+  if (finalSortedEditors.length > 0) {
+    set("dom-editor-val", finalSortedEditors[0][0]);
+    // If we used the fallback, it means we counted users, not events
+    const subLabel = isSeatFallback ? "active users" : "events";
+    set(
+      "dom-editor-sub",
+      `${finalSortedEditors[0][1].toLocaleString()} ${subLabel}`
+    );
   } else {
     set("dom-editor-val", "—");
     set("dom-editor-sub", "No data");
@@ -861,7 +1743,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
     window[canvasId + "Instance"] = new Chart(ctx, config);
   };
 
-  // Top Languages
+  // Top Languages Chart
   if (sortedLangs.length > 0) {
     drawChart("cpLangChart", {
       type: "doughnut",
@@ -878,6 +1760,14 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
               "#ef4444",
               "#ec4899",
               "#64748b",
+              "#0ea5e9",
+              "#14b8a6",
+              "#f97316",
+              "#84cc16",
+              "#a855f7",
+              "#eab308",
+              "#f43f5e",
+              "#06b6d4",
             ],
             borderWidth: 0,
             hoverOffset: 6,
@@ -903,30 +1793,49 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
     });
   }
 
-  // Active Editors
-  if (sortedEditors.length > 0) {
+  // Active Editors Chart
+  if (finalSortedEditors.length > 0) {
     drawChart("cpEditorChart", {
-      type: "bar",
+      type: "doughnut",
       data: {
-        labels: sortedEditors.map((item) => item[0]),
+        labels: finalSortedEditors.map((item) => item[0]),
         datasets: [
           {
-            label: "Active Seats",
-            data: sortedEditors.map((item) => item[1]),
-            backgroundColor: "#3b82f6",
-            borderRadius: 4,
+            data: finalSortedEditors.map((item) => item[1]),
+            backgroundColor: [
+              "#059669",
+              "#d97706",
+              "#2563eb",
+              "#7c3aed",
+              "#db2777",
+              "#475569",
+              "#0ea5e9",
+            ],
+            borderWidth: 0,
+            hoverOffset: 6,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        cutout: "65%",
+        plugins: {
+          legend: {
+            position: "right",
+            labels: {
+              usePointStyle: true,
+              boxWidth: 8,
+              color: "#64748b",
+              font: { size: 11 },
+            },
+          },
+        },
       },
     });
   }
 
-  // Daily Trend Charts (Bottom row)
+  // Daily Trend Charts
   const dates = Object.keys(dailyStats);
   if (dates.length > 0) {
     const shownData = dates.map((d) => dailyStats[d].shown);
@@ -1005,6 +1914,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
     });
   }
 }
+
 function updateCopilotHeroBar(cpSeatsData) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
 
@@ -1109,6 +2019,145 @@ function updateSavingsBanner(cpSeatsData) {
     ).toLocaleString()}/yr wasted`
   );
 }
+
+// Keep a reference to the chart instance
+let spendChartInstance = null;
+
+function renderUserSpendChart(cpSeatsData, orgAiCredits) {
+  console.log("--- DEBUG: renderUserSpendChart STARTED ---");
+  console.log("DEBUG: Input cpSeatsData:", cpSeatsData);
+  console.log("DEBUG: Input orgAiCredits:", orgAiCredits);
+
+  // 1. Data Check
+  if (!cpSeatsData || cpSeatsData.length === 0) {
+    console.error(
+      "❌ DEBUG FAIL: cpSeatsData is completely empty or undefined!"
+    );
+    return;
+  }
+
+  try {
+    // 2. Math Check (Total User Spend)
+    const calculatedTotalSpend = cpSeatsData.reduce((sum, seat) => {
+      return sum + parseFloat(seat.net_amount || 0);
+    }, 0);
+
+    // 3. FIX: Aggressive Budget Check
+    // If the whole payload was passed by accident, extract org_ai_credits
+    let safeOrgData = orgAiCredits;
+    if (orgAiCredits && orgAiCredits.org_ai_credits) {
+      safeOrgData = orgAiCredits.org_ai_credits;
+    }
+    const budget = safeOrgData ? safeOrgData.budget_usd || 0 : 0;
+    console.log("DEBUG: Extracted Budget:", budget);
+
+    // 4. Subtitle DOM Check
+    const cardSub = document.getElementById("org-spend-subtitle");
+    if (cardSub) {
+      let subHtml = `<strong>Total User Spend:</strong> $${calculatedTotalSpend.toFixed(
+        2
+      )}`;
+
+      // Even if budget is 0, we'll print it out for debugging purposes now
+      if (budget > 0) {
+        subHtml += ` <span style="color:#94a3b8; font-weight:normal;">/ $${budget.toLocaleString()} Org Budget</span>`;
+      } else {
+        subHtml += ` <span style="color:#ef4444; font-weight:normal; font-size:11px;">(Budget data missing from API)</span>`;
+      }
+
+      cardSub.innerHTML = subHtml;
+      cardSub.style.color = "#334155";
+      cardSub.style.fontSize = "13px";
+      cardSub.style.marginBottom = "10px";
+    }
+
+    // 5. Sorting Check
+    const topUsers = [...cpSeatsData]
+      .sort(
+        (a, b) => parseFloat(b.net_amount || 0) - parseFloat(a.net_amount || 0)
+      )
+      .slice(0, 10);
+
+    const labels = topUsers.map((seat) => seat.user || seat.name || "Unknown");
+    const dataPoints = topUsers.map((seat) => parseFloat(seat.net_amount || 0));
+
+    // 6. Canvas Check
+    const canvasEl = document.getElementById("orgSpendChart");
+    if (!canvasEl) return;
+
+    if (typeof Chart === "undefined") return;
+
+    // Destroy old chart if it exists
+    if (spendChartInstance) {
+      spendChartInstance.destroy();
+    }
+
+    // 7. Array of colors for the Doughnut slices
+    const sliceColors = [
+      "#8b5cf6", // Purple
+      "#10b981", // Green
+      "#f59e0b", // Amber
+      "#ef4444", // Red
+      "#3b82f6", // Blue
+      "#ec4899", // Pink
+      "#14b8a6", // Teal
+      "#f97316", // Orange
+      "#6366f1", // Indigo
+      "#84cc16", // Lime
+    ];
+
+    // 8. Draw Circle Chart
+    spendChartInstance = new Chart(canvasEl, {
+      type: "doughnut", // Changed to doughnut (circle)
+      data: {
+        labels: labels,
+        datasets: [
+          {
+            label: "User Spend ($)",
+            data: dataPoints,
+            backgroundColor: sliceColors, // Array of colors applied here
+            borderWidth: 2,
+            hoverOffset: 4, // Makes the slice pop out when hovered
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          // Moved legend to the right side so it fits nicely next to the circle
+          legend: {
+            display: true,
+            position: "right",
+            labels: {
+              boxWidth: 12,
+              font: { size: 11 },
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                // Formatting tooltip to show "Name: $123.45"
+                const label = context.label || "";
+                const val = context.parsed || 0;
+                return ` ${label}: $${val.toFixed(2)}`;
+              },
+            },
+          },
+        },
+        // IMPORTANT: Scales (x and y axes) are completely removed. Circle charts break if you include them!
+        cutout: "65%", // Adjusts how thick the doughnut ring is
+      },
+    });
+
+    console.log("✅ DEBUG: Doughnut Chart rendered successfully!");
+  } catch (error) {
+    console.error(
+      "❌ DEBUG CRITICAL ERROR inside renderUserSpendChart:",
+      error
+    );
+  }
+}
 function renderCopilotCharts(cpSeatsData, cpHistoryData) {
   // --- 1. TOP LANGUAGES (Doughnut Chart) ---
   const langMap = {};
@@ -1120,7 +2169,7 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
     });
   }
 
-  const topLangs = Object.keys(langMap)
+  const topLangs = Object.keys(langStats)
     .map((name) => ({ name, val: langMap[name] }))
     .sort((a, b) => b.val - a.val)
     .slice(0, 5);
@@ -1394,7 +2443,267 @@ function updateTokenWarnings(clMembers) {
       No users currently approaching limit
     </div>`;
 }
+// ── 1. ROBUST Normalizer (With Safe Date Parsing) ────────────────────────
+const normalizedSeats = cpSeatsData
+  .map((s) => {
+    // Safely parse credits and amounts
+    const cleanCredits =
+      typeof s.net_credits === "string"
+        ? parseFloat(s.net_credits.replace(/[^0-9.-]+/g, ""))
+        : parseFloat(s.net_credits || 0);
+
+    const cleanAmount =
+      typeof s.net_amount === "string"
+        ? parseFloat(s.net_amount.replace(/[^0-9.-]+/g, ""))
+        : parseFloat(s.net_amount || 0);
+
+    // SAFELY parse the date to prevent "Invalid Date" errors
+    const rawDate = s.last_activity || s.last;
+    let timestamp = 0;
+
+    if (rawDate && rawDate !== "Never" && rawDate !== "—") {
+      const parsedDate = new Date(rawDate);
+      if (!isNaN(parsedDate.getTime())) {
+        timestamp = parsedDate.getTime();
+      }
+    }
+
+    const finalEditor =
+      typeof getCleanEditorName === "function"
+        ? getCleanEditorName(s.last_editor || s.editor)
+        : s.last_editor || s.editor || "—";
+
+    // We MUST return these exact keys so renderCpTable can see them!
+    return {
+      ...s,
+      netCredits: cleanCredits,
+      netAmount: cleanAmount,
+      displayName: s.user || s.name || "Unknown User",
+      team: s.team || "—",
+      cleanTimestamp: timestamp, // <-- This generates the dates!
+      cleanEditor: finalEditor, // <-- This generates the clean editor names!
+      rawDate: rawDate, // <-- This checks if they are active!
+    };
+  })
+  .sort((a, b) => b.netAmount - a.netAmount);
+
+// function updateCopilotTokenWarnings(cpSeatsData, orgAiCredits) {
+//   if (!cpSeatsData || cpSeatsData.length === 0) return;
+
+//   const tbody = document.getElementById("cp-tbody");
+//   const criticalContainer = document.getElementById("critical-dollars-list");
+
+//   // If the container doesn't exist on the page, stop running
+//   if (!criticalContainer) return;
+
+//   let listHtml = "";
+//   let tableHtml = "";
+
+//   // ── Normalise seats (Removed Gross Variables completely) ───────────────────
+//   const normalizedSeats = cpSeatsData.map((s) => {
+//     const netCredits = parseFloat(s?.net_credits || 0);
+//     const netAmount = parseFloat(s?.net_amount || 0);
+//     const poolSharePct = parseFloat(s?.pool_share_pct || 0);
+
+//     return {
+//       ...s,
+//       netCredits,
+//       netAmount,
+//       poolSharePct,
+//       displayName: s.user || s.name || "Unknown User",
+//       team: s.team || "—",
+//     };
+//   });
+
+//   // ── Sort by highest NET spend first ──────────────────────────────────────
+//   const sortedSeats = [...normalizedSeats].sort(
+//     (a, b) => b.netAmount - a.netAmount
+//   );
+
+//   // ── Warning thresholds (Evaluating against Net Billed) ───────────────────
+//   const APPROACHING_THRESHOLD_USD = 50;
+//   const CRITICAL_THRESHOLD_USD = 200;
+
+//   sortedSeats.forEach((seat) => {
+//     const lastActivity = seat.last_activity
+//       ? new Date(seat.last_activity).toLocaleDateString("en-US", {
+//           month: "short",
+//           day: "numeric",
+//           year: "numeric",
+//         })
+//       : "—";
+
+//     // ── Table row (Gross columns strictly removed) ────────────────────────
+//     tableHtml += `
+//       <tr>
+//         <td>${seat.displayName}</td>
+//         <td>${seat.user || "—"}</td>
+//         <td>${seat.team}</td>
+//         <td>${seat.last_activity || "—"}</td>
+//         <td>${lastActivity}</td>
+//         <td>${seat.last_editor || "—"}</td>
+//         <td style="font-weight: 500;">${seat.netCredits.toLocaleString(
+//           undefined,
+//           {
+//             maximumFractionDigits: 2,
+//           }
+//         )}</td>
+//         <td style="color: #10b981; font-weight: 600;">$${seat.netAmount.toFixed(
+//           2
+//         )}</td>
+//       </tr>`;
+
+//     // ── Threshold Check ───────────────────────────────────────────────────
+//     // If they spent less than $50, they stay in the table but skip the sidebar
+//     if (seat.netAmount < APPROACHING_THRESHOLD_USD) return;
+
+//     // ── Sidebar List (Clean UI, No Gross Text) ────────────────────────────
+//     const isCritical = seat.netAmount >= CRITICAL_THRESHOLD_USD;
+//     const color = isCritical ? "#ef4444" : "#f59e0b"; // Red if >$200, Orange if >$50
+
+//     const rowHtml = `
+//       <div class="reclaim-item">
+//         <div>
+//           <div class="ri-name">${seat.displayName}</div>
+//           <div class="ri-sub">${seat.netCredits.toLocaleString(undefined, {
+//             maximumFractionDigits: 0,
+//           })} ai credits</div>
+//         </div>
+//         <span class="ri-cost" style="color: ${color};">$${seat.netAmount.toFixed(
+//       2
+//     )}</span>
+//       </div>`;
+
+//     // Add them to the unified list
+//     listHtml += rowHtml;
+//   });
+
+//   // ── Inject HTML into the DOM ────────────────────────────────────────────
+//   if (tbody) {
+//     tbody.innerHTML =
+//       tableHtml ||
+//       `<tr><td colspan="8" style="text-align:center;">No Copilot seat data available</td></tr>`;
+//   }
+
+//   // Inject the unified list into the single critical container
+//   criticalContainer.innerHTML =
+//     listHtml ||
+//     `<div style="padding:10px;text-align:center;color:#94a3b8;font-size:12px;">
+//       No users with high spend
+//     </div>`;
+
+//   // ── Org-level summary cards ───────────────────────────────────────────────
+//   if (orgAiCredits) {
+//     const setEl = (id, val) => {
+//       const el = document.getElementById(id);
+//       if (el) el.textContent = val;
+//     };
+//     setEl(
+//       "org-budget-usd",
+//       `$${(orgAiCredits.budget_usd || 0).toLocaleString()}`
+//     );
+//     // Note: Assuming your API returns gross_credits_used for total credits
+//     setEl(
+//       "org-credits-used",
+//       (orgAiCredits.gross_credits_used || 0).toLocaleString(undefined, {
+//         maximumFractionDigits: 0,
+//       })
+//     );
+//     setEl(
+//       "org-net-billed",
+//       `$${(orgAiCredits.net_amount_usd || 0).toFixed(2)}`
+//     );
+//     setEl(
+//       "org-utilization-pct",
+//       `${(orgAiCredits.utilization_pct || 0).toFixed(2)}%`
+//     );
+//   }
+// }
 // ── Tokens by Model donut ──────────────────────────────
+function updateCopilotTokenWarnings(cpSeatsData, orgAiCredits) {
+  if (!cpSeatsData || cpSeatsData.length === 0) return;
+
+  const criticalContainer = document.getElementById("critical-dollars-list");
+
+  // ── Normalise seats ──────────────────────────────────────────────────────
+  const normalizedSeats = cpSeatsData.map((s) => {
+    return {
+      ...s,
+      netCredits: parseFloat(s?.net_credits || 0),
+      netAmount: parseFloat(s?.net_amount || 0),
+      displayName: s.user || s.name || "Unknown User",
+      team: s.team || "—",
+    };
+  });
+
+  // Save the normalized data to our global variable so sortCp() can use it!
+  currentCpSeats = normalizedSeats;
+
+  // ── Render Sidebar (Always sorted by highest Net Amount) ─────────────────
+  if (criticalContainer) {
+    const sidebarSeats = [...normalizedSeats].sort(
+      (a, b) => b.netAmount - a.netAmount
+    );
+    let listHtml = "";
+
+    const APPROACHING_THRESHOLD_USD = 50;
+    const CRITICAL_THRESHOLD_USD = 200;
+
+    sidebarSeats.forEach((seat) => {
+      if (seat.netAmount < APPROACHING_THRESHOLD_USD) return;
+
+      const isCritical = seat.netAmount >= CRITICAL_THRESHOLD_USD;
+      const color = "#d97706";
+      // const color = isCritical ? "#ef4444" : "#f59e0b";
+
+      listHtml += `
+        <div class="reclaim-item">
+          <div>
+            <div class="ri-name">${seat.displayName}</div>
+            <div class="ri-sub">${seat.netCredits.toLocaleString(undefined, {
+              maximumFractionDigits: 0,
+            })} ai credits</div>
+          </div>
+          <span class="ri-cost" style="color: ${color};">$${seat.netAmount.toFixed(
+        2
+      )}</span>
+        </div>`;
+    });
+
+    criticalContainer.innerHTML =
+      listHtml ||
+      `<div style="padding:10px;text-align:center;color:#94a3b8;font-size:12px;">No users with high spend</div>`;
+  }
+
+  // ── Trigger the initial table render ─────────────────────────────────────
+  renderCpTable();
+
+  // ── Org-level summary cards ──────────────────────────────────────────────
+  if (orgAiCredits) {
+    const setEl = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+    setEl(
+      "org-budget-usd",
+      `$${(orgAiCredits.budget_usd || 0).toLocaleString()}`
+    );
+    setEl(
+      "org-credits-used",
+      (orgAiCredits.gross_credits_used || 0).toLocaleString(undefined, {
+        maximumFractionDigits: 0,
+      })
+    );
+    setEl(
+      "org-net-billed",
+      `$${(orgAiCredits.net_amount_usd || 0).toFixed(2)}`
+    );
+    setEl(
+      "org-utilization-pct",
+      `${(orgAiCredits.utilization_pct || 0).toFixed(2)}%`
+    );
+  }
+}
 function renderClModelChart(rows) {
   // Aggregate total_tokens per model from your data
   const modelTotals = {};
@@ -1450,24 +2759,149 @@ function renderClModelChart(rows) {
 // ─────────────────────────────────────────────────────
 // 2. FETCH DATA (THE ONLY SOURCE OF TRUTH)
 // ─────────────────────────────────────────────────────
+// async function fetchRealTimeDashboardData() {
+//   const refreshBtn = document.getElementById("refresh-icon");
+//   try {
+//     console.log("Loading Data...");
+//     const response = await fetch("/api/dashboard-data");
+//     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+//     console.log("Data Loaded Successfully");
+
+//     const payload = await response.json();
+//     console.log("Data loaded successfully:", payload);
+
+//     // Add this right after you get the payload
+//     if (payload.copilot_seats && payload.copilot_seats.length > 0) {
+//       const sample = payload.copilot_seats[0];
+//     } else {
+//       console.warn("Copilot seats array is empty or missing!");
+//     }
+
+//     // --- Claude Mapping ---
+//     if (payload.claude_seats) {
+//       clMembers = payload.claude_seats.map((s) => ({
+//         name: s.user || "Unknown",
+//         email: s.email || "",
+//         team: s.team || "Unassigned",
+//         spend: s.spend_usd || 0,
+//         requests: Math.floor((s.spend_usd || 0) * 20),
+//         cap: s.limit_usd || 0,
+//         util:
+//           s.limit_usd > 0
+//             ? Math.min(Math.round((s.spend_usd / s.limit_usd) * 100), 100)
+//             : 0,
+//       }));
+
+//       const sortedBySpend = [...clMembers]
+//         .filter((m) => m.spend > 0)
+//         .sort((a, b) => b.spend - a.spend);
+//       topTotal = sortedBySpend
+//         .slice(0, 12)
+//         .map((m) => ({ name: m.name, val: m.spend }));
+//       topToday = sortedBySpend
+//         .slice(0, 12)
+//         .map((m) => ({ name: m.name, val: m.spend / 30 }));
+
+//       const teamMap = {};
+//       clMembers.forEach(
+//         (m) => (teamMap[m.team] = (teamMap[m.team] || 0) + m.spend)
+//       );
+//       clTeamSpend = Object.keys(teamMap).map((t) => ({ t, v: teamMap[t] }));
+
+//       // --- Model Token Mapping ---
+//       // Assuming payload.claude contains usage logs with a 'model' and 'tokens' (or 'cost') field.
+//       if (payload.claude && payload.claude.length > 0) {
+//         const modelMap = {};
+//         payload.claude.forEach((log) => {
+//           const modelName = log.model || "Unknown Model";
+//           // Change log.tokens to log.cost if you want to chart by spend instead of tokens
+//           modelMap[modelName] =
+//             (modelMap[modelName] || 0) + (log.tokens || log.cost || 1);
+//         });
+
+//         // Populate the global variable
+//         clModelData = {
+//           labels: Object.keys(modelMap),
+//           values: Object.values(modelMap),
+//         };
+//         console.log("Mapped Model Data:", clModelData); // Debug log
+//       } else {
+//         // Fallback demo data if payload.claude is empty
+//         clModelData = {
+//           labels: ["Claude 3.5 Sonnet", "Claude 3 Opus", "Claude 3 Haiku"],
+//           values: [450, 120, 300],
+//         };
+//       }
+
+//       renderClaude();
+//     }
+
+//     // --- Copilot Mapping ---
+//     if (payload.copilot_seats) {
+//       cpSeatsData = payload.copilot_seats.map((s) => ({
+//         name: s.user,
+//         user: s.user, // ← ADD THIS
+//         github: s.user,
+//         team: s.team || "Unassigned",
+//         activity: s.last_activity ? "active" : "inactive",
+//         last: s.last_activity || "Never",
+//         last_editor: s.last_editor || "", // ← ADD THIS (keep original key)
+//         editor: s.last_editor || "—",
+//         cost: s.spend_usd || 0,
+//         lines_accepted: s.lines_accepted || 0, // ← ADD THIS too (fixes avgLines)
+//         unmapped: false,
+//         gross_credits: s.gross_credits,
+//         gross_amount: s.gross_amount,
+//         net_credits: s.net_credits,
+//         net_amount: s.net_amount,
+//         discount_amount: s.discount_amount,
+//         // ADD THESE THREE:
+//         spend_usd: s.spend_usd || 0,
+//         limit_usd: s.limit_usd || 0,
+//         remaining_usd: s.remaining_usd || 0,
+//       }));
+//       renderCopilot();
+//     }
+
+//     // 1. Update the UI Stats (Dashboard Cards)
+//     updateClaudeDashboard(clMembers);
+//     updateTokenWarnings(clMembers);
+//     updateCopilotHeroBar(cpSeatsData);
+//     updateSavingsBanner(cpSeatsData);
+//     updateCopilotDashboard(payload.copilot, cpSeatsData);
+//     updateCopilotTokenWarnings(cpSeatsData);
+//     // renderCopilotCharts(cpSeatsData, payload.copilot_history);
+//     // renderCopilotCharts(cpSeatsData, payload.copilot_history);
+
+//     // 2. Render Charts (Final step, done only once)
+//     renderClaude();
+//     renderCopilot();
+//     renderClModelChart(payload.claude);
+//     renderOrgSpendChart(cpSeatsData, payload.org_ai_credits);
+
+//     // 3. FIX: Trigger the "All" view to populate the Table and Stats automatically
+//     // This calls your existing filtering function as if you had clicked "All"
+//     filterSeats("all", null);
+
+//     if (refreshBtn) refreshBtn.textContent = "⏳"; // Change to hourglass
+//   } catch (err) {
+//     console.error("❌ Error loading dashboard:", err);
+//     showErrorState("dashboard");
+//   } finally {
+//     if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
+//   }
+// }
 async function fetchRealTimeDashboardData() {
   const refreshBtn = document.getElementById("refresh-icon");
   try {
     console.log("Loading Data...");
     const response = await fetch("/api/dashboard-data");
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    console.log("Data Loaded Successfully");
 
     const payload = await response.json();
     console.log("Data loaded successfully:", payload);
 
-    // Add this right after you get the payload
-    console.log("--- INSPECTING PAYLOAD ---");
-    if (payload.copilot_seats && payload.copilot_seats.length > 0) {
-      const sample = payload.copilot_seats[0];
-      console.log("Available keys in seat data:", Object.keys(sample));
-      console.log("Sample seat object:", sample);
-    } else {
+    if (!payload.copilot_seats || payload.copilot_seats.length === 0) {
       console.warn("Copilot seats array is empty or missing!");
     }
 
@@ -1489,9 +2923,11 @@ async function fetchRealTimeDashboardData() {
       const sortedBySpend = [...clMembers]
         .filter((m) => m.spend > 0)
         .sort((a, b) => b.spend - a.spend);
+
       topTotal = sortedBySpend
         .slice(0, 12)
         .map((m) => ({ name: m.name, val: m.spend }));
+
       topToday = sortedBySpend
         .slice(0, 12)
         .map((m) => ({ name: m.name, val: m.spend / 30 }));
@@ -1503,22 +2939,19 @@ async function fetchRealTimeDashboardData() {
       clTeamSpend = Object.keys(teamMap).map((t) => ({ t, v: teamMap[t] }));
 
       // --- Model Token Mapping ---
-      // Assuming payload.claude contains usage logs with a 'model' and 'tokens' (or 'cost') field.
       if (payload.claude && payload.claude.length > 0) {
         const modelMap = {};
         payload.claude.forEach((log) => {
           const modelName = log.model || "Unknown Model";
-          // Change log.tokens to log.cost if you want to chart by spend instead of tokens
           modelMap[modelName] =
             (modelMap[modelName] || 0) + (log.tokens || log.cost || 1);
         });
 
-        // Populate the global variable
         clModelData = {
           labels: Object.keys(modelMap),
           values: Object.values(modelMap),
         };
-        console.log("Mapped Model Data:", clModelData); // Debug log
+        console.log("Mapped Model Data:", clModelData);
       } else {
         // Fallback demo data if payload.claude is empty
         clModelData = {
@@ -1526,51 +2959,68 @@ async function fetchRealTimeDashboardData() {
           values: [450, 120, 300],
         };
       }
-
-      renderClaude();
+      // REMOVED duplicate renderClaude() from here
     }
 
     // --- Copilot Mapping ---
     if (payload.copilot_seats) {
       cpSeatsData = payload.copilot_seats.map((s) => ({
         name: s.user,
+        user: s.user,
         github: s.user,
         team: s.team || "Unassigned",
         activity: s.last_activity ? "active" : "inactive",
         last: s.last_activity || "Never",
+        last_editor: s.last_editor || "",
         editor: s.last_editor || "—",
         cost: s.spend_usd || 0,
+        lines_accepted: s.lines_accepted || 0,
         unmapped: false,
+        gross_credits: s.gross_credits,
+        gross_amount: s.gross_amount,
+        net_credits: s.net_credits,
+        net_amount: s.net_amount,
+        discount_amount: s.discount_amount,
+        spend_usd: s.spend_usd || 0,
+        limit_usd: s.limit_usd || 0,
+        remaining_usd: s.remaining_usd || 0,
       }));
-      renderCopilot();
+      // REMOVED duplicate renderCopilot() from here
     }
 
     // 1. Update the UI Stats (Dashboard Cards)
-    updateClaudeDashboard(clMembers);
-    updateTokenWarnings(clMembers);
-    updateCopilotDashboard(payload.copilot, cpSeatsData);
-    updateCopilotHeroBar(cpSeatsData);
-    updateSavingsBanner(cpSeatsData);
+    if (typeof clMembers !== "undefined") {
+      updateClaudeDashboard(clMembers);
+      updateTokenWarnings(clMembers);
+    }
+
+    if (typeof cpSeatsData !== "undefined") {
+      updateCopilotHeroBar(cpSeatsData);
+      updateSavingsBanner(cpSeatsData);
+      updateCopilotDashboard(payload.copilot, cpSeatsData);
+
+      // FIXED: Added payload.org_ai_credits so your summary cards update!
+      updateCopilotTokenWarnings(cpSeatsData, payload.org_ai_credits);
+    }
 
     // 2. Render Charts (Final step, done only once)
     renderClaude();
     renderCopilot();
     renderClModelChart(payload.claude);
 
-    // 3. FIX: Trigger the "All" view to populate the Table and Stats automatically
-    // This calls your existing filtering function as if you had clicked "All"
-    filterSeats("all", null);
-    renderCopilotCharts(cpSeatsData, payload.copilot_history);
+    // FIXED: Renamed to match the User Bar Chart we just created!
+    renderUserSpendChart(cpSeatsData, payload?.org_ai_credits);
+    console.log(`org_ai_credits`, payload);
 
-    if (refreshBtn) refreshBtn.textContent = "⏳"; // Change to hourglass
+    // 3. Trigger the "All" view to populate the Table and Stats automatically
+    // filterSeats("all", null);
   } catch (err) {
     console.error("❌ Error loading dashboard:", err);
-    showErrorState("dashboard");
+    if (typeof showErrorState === "function") showErrorState("dashboard");
   } finally {
     if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
   }
 }
-
 // ─────────────────────────────────────────────────────
 // 3. RENDERERS & HELPERS (No more crashing!)
 // ─────────────────────────────────────────────────────
