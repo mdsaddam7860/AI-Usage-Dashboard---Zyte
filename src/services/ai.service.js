@@ -288,7 +288,7 @@ function ensureCacheDir() {
 }
 
 // const CACHE_TTL_MS = 1000; // 5 minutes
-const CACHE_TTL_MS = 24 * 600 * 60 * 60 * 1000; // 5 minutes
+const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
 
 /**
  * Returns cached data if it exists and is younger than CACHE_TTL_MS.
@@ -356,6 +356,8 @@ async function fetchClaudeData(apiKey) {
     logger.debug("Claude: loaded from file cache");
     return cached;
   }
+
+  logger.info("Fetching Claude data...");
 
   const seats = [];
   const rows = [];
@@ -689,6 +691,8 @@ async function fetchCopilotData(token, org) {
     logger.debug("Copilot: loaded from file cache");
     return cached;
   }
+
+  logger.info("Fetching Copilot data...");
 
   const headers = {
     Authorization: `Bearer ${token}`,
