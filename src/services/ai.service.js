@@ -288,7 +288,8 @@ function ensureCacheDir() {
 }
 
 // const CACHE_TTL_MS = 1000; // 5 minutes
-const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
+// const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 59 minutes
 
 /**
  * Returns cached data if it exists and is younger than CACHE_TTL_MS.
@@ -347,12 +348,12 @@ const ESTIMATION_CONFIG = {
   defaultWorkspace: "estimated",
   defaultModel: "estimated",
 };
-async function fetchClaudeData(apiKey) {
+async function fetchClaudeData(apiKey, isRefreshData = false) {
   if (!apiKey) return { claude: [], claude_seats: [] };
 
   // 1. Try file cache first
   const cached = readCache(CLAUDE_CACHE_FILE);
-  if (cached) {
+  if (cached && !isRefreshData) {
     logger.debug("Claude: loaded from file cache");
     return cached;
   }

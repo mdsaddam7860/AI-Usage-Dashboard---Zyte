@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
 import { fetchClaudeData, fetchCopilotData } from "./services/ai.service.js";
+import { scrapeWisprData } from "./integrations/wispr/wisprScraper.js";
 
 // 1. Recreate __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -30,9 +31,10 @@ app.get("/api/dashboard-data", async (req, res) => {
     const gOrg = typeof ghOrg === "function" ? ghOrg() : ghOrg;
 
     // Fetch data concurrently using resolved credentials
-    const [claudeData, copilotData] = await Promise.all([
+    const [claudeData, copilotData, wisprData] = await Promise.all([
       fetchClaudeData(aKey),
       fetchCopilotData(gToken, gOrg),
+      scrapeWisprData(process.env.WISPR_EMAIL, process.env.WISPR_PASSWORD),
     ]);
 
     // Construct the response payload
@@ -44,6 +46,7 @@ app.get("/api/dashboard-data", async (req, res) => {
       copilot: copilotData.copilot || [],
       copilot_seats: copilotData.copilot_seats || [],
       org_ai_credits: copilotData.org_ai_credits || {},
+      wispr: wisprData || {},
     };
 
     // Store log entry (Ensure 'logger' is available globally or imported)
