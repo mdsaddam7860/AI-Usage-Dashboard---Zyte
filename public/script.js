@@ -119,6 +119,654 @@ function exportToCSVClaude() {
 
   URL.revokeObjectURL(url);
 }
+// Ensure you have Chart.js included in your <head> for the graphs to work!
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+function populateExecutiveSummary() {
+  // --- Helper formatters ---
+  const money = (n) =>
+    n == null
+      ? "—"
+      : "$" +
+        Number(n).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+  const money0 = (n) =>
+    n == null
+      ? "—"
+      : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const num = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US"));
+
+  // --- TAILWIND KPI CARD GENERATOR ---
+  function kpiCard(label, value, hint) {
+    return `
+      <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div>
+          <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">${label}</div>
+          <div class="text-2xl font-bold mt-1 tracking-tight text-gray-900">${value}</div>
+        </div>
+        ${hint ? `<div class="text-xs text-gray-500 mt-2">${hint}</div>` : ""}
+      </div>
+    `;
+  }
+
+  // 1. Populate Claude KPI Cards
+  const CL = window.claudeData;
+  if (CL && CL.summary) {
+    const s = CL.summary;
+    document.getElementById("execClaude").innerHTML =
+      kpiCard(
+        "MTD spend",
+        money(s.total_mtd_spend),
+        `proj. ${money0(s.projected_month_spend)}`
+      ) +
+      kpiCard("Active", `${s.active_members}/${s.member_count}`, "spend > 0") +
+      kpiCard("Avg / active", money(s.avg_per_active), "") +
+      kpiCard("MAU", num(s.mau), "users/month");
+  }
+
+  // 2. Populate Copilot KPI Cards
+  const CP = window.copilotData;
+  if (CP && CP.summary) {
+    const s = CP.summary;
+    document.getElementById("execCopilot").innerHTML =
+      kpiCard(
+        "Total cost (MTD)",
+        money0(s.total_cost != null ? s.total_cost : s.seats_cost),
+        `seats ${money0(s.seats_cost)} + usage ${money0(s.metered_cost || 0)}`
+      ) +
+      kpiCard("Active seats", `${s.active30}/${s.total_seats}`, "30 days") +
+      kpiCard(
+        "Reclaimable/mo",
+        money0(s.reclaimable_mo),
+        `${s.inactive30} inactive`
+      ) +
+      kpiCard("Acceptance", s.acceptance_rate + "%", "28 days");
+  }
+
+  // 3. Render Combined Charts (Claude vs Copilot)
+  // We keep the original brand colors (#B02CCE and #181E5A) for the charts so they match the logos
+  const labels = CL
+    ? CL.daily.slice(-30).map((d) => d.date.slice(5))
+    : CP && CP.daily
+    ? CP.daily.slice(-30).map((d) => d.date.slice(5))
+    : [];
+  const ds = [];
+  if (CL) {
+    ds.push({
+      label: "Claude",
+      data: CL.daily.slice(-30).map((d) => d.cost_usd),
+      borderColor: "#B02CCE",
+      backgroundColor: "rgba(176,44,206,.15)",
+      fill: true,
+      tension: 0.3,
+    });
+  }
+  if (CP) {
+    const dim = (CL && CL.summary.days_in_month) || 30;
+    const perDay = +(CP.summary.monthly_cost / dim).toFixed(2);
+    ds.push({
+      label: "Copilot (seats · prorated)",
+      data: labels.map(() => perDay),
+      borderColor: "#181E5A",
+      borderDash: [5, 4],
+      pointRadius: 0,
+      tension: 0,
+    });
+  }
+  if (ds.length) {
+    new Chart(document.getElementById("execSpend"), {
+      type: "line",
+      data: { labels, datasets: ds },
+      options: {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        scales: {
+          x: { grid: { color: "#e5e7eb" } },
+          y: { grid: { color: "#e5e7eb" } },
+        },
+      },
+    });
+  }
+
+  const dl = [],
+    dv = [];
+  if (CL) {
+    dl.push("Claude");
+    dv.push(CL.summary.projected_month_spend);
+  }
+  if (CP) {
+    dl.push("Copilot");
+    dv.push(
+      CP.summary.total_cost != null
+        ? CP.summary.total_cost
+        : CP.summary.monthly_cost
+    );
+  }
+  if (dl.length) {
+    const total = dv.reduce((a, b) => a + b, 0);
+    document.getElementById("execProjCap").textContent =
+      "Total projected: " +
+      money0(total) +
+      " · " +
+      dl.map((l, i) => l + " " + money0(dv[i])).join(" · ");
+    new Chart(document.getElementById("execAdopt"), {
+      type: "doughnut",
+      data: {
+        labels: dl,
+        datasets: [{ data: dv, backgroundColor: ["#B02CCE", "#181E5A"] }],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: { label: (c) => c.label + ": " + money0(c.parsed) },
+          },
+        },
+      },
+    });
+  }
+
+  // 4. Populate Wispr Flow Data
+  const WF = window.wisprFlowData;
+  if (WF) {
+    const line =
+      `${num(WF.members)} members · ${num(
+        WF.active_seats
+      )} active seats · ${num(
+        WF.words_dictated_all_time
+      )} words dictated (all time)` +
+      (WF.as_of ? ` · snapshot ${WF.as_of}` : "");
+    document.getElementById("execWisprLine").textContent = line;
+
+    const delta = WF.words_delta_pct;
+    const trendStr =
+      delta != null ? (delta >= 0 ? "+" : "") + delta + "%" : "—";
+
+    // Add a text-green-600 or text-red-600 class directly to the trend HTML if you want it colored
+    const trendHtml = `<span class="${
+      delta >= 0 ? "text-green-600" : "text-red-600"
+    }">${trendStr}</span>`;
+
+    document.getElementById("execWispr").innerHTML =
+      kpiCard(
+        "Users",
+        num(WF.members),
+        `${num(WF.active_seats)} active seats`
+      ) +
+      kpiCard("Words dictated", num(WF.words_dictated_all_time), "all time") +
+      kpiCard("Weekly trend", trendHtml, WF.words_delta_window || "") +
+      kpiCard(
+        "Top app",
+        WF.top_apps && WF.top_apps[0]
+          ? `${WF.top_apps[0].app} ${WF.top_apps[0].pct}%`
+          : "—",
+        "by dictation"
+      );
+
+    const apps = (WF.top_apps || []).slice(0, 10);
+    if (apps.length) {
+      new Chart(document.getElementById("execWisprApps"), {
+        type: "bar",
+        data: {
+          labels: apps.map((a) => a.app),
+          datasets: [
+            {
+              label: "% of dictation",
+              data: apps.map((a) => a.pct),
+              backgroundColor: [
+                "#B02CCE",
+                "#181E5A",
+                "#009A2F",
+                "#33525F",
+                "#9BADB5",
+                "#E8520A",
+              ],
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          scales: {
+            x: { grid: { color: "#e5e7eb" } },
+            y: { grid: { color: "#e5e7eb" } },
+          },
+          plugins: { legend: { display: false } },
+        },
+      });
+    } else {
+      document.getElementById("execWisprAppsCard").style.display = "none";
+    }
+  } else {
+    document.getElementById("execWisprTitle").style.display = "none";
+    document.getElementById("execWisprLine").style.display = "none";
+    document.getElementById("execWisprAppsCard").style.display = "none";
+  }
+}
+function renderExecutiveCharts(clMembers, cpSeatsData) {
+  // 1. Helper formatting and colors
+  const money0 = (n) =>
+    n == null
+      ? "—"
+      : "$" + Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  const money2 = (n) =>
+    n == null
+      ? "—"
+      : "$" +
+        Number(n).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+  const colors = { claude: "#B02CCE", copilot: "#181E5A" };
+
+  // ==========================================
+  // CALCULATE SUMMARY METRICS FROM RAW DATA
+  // ==========================================
+
+  // Claude Summary
+  const claudeTotalSpend = clMembers.reduce(
+    (sum, m) => sum + (m.spend || 0),
+    0
+  );
+  const claudeProjectedSpend = claudeTotalSpend; // Or multiply by days ratio if needed
+  const claudeActiveMembers = clMembers.filter((m) => m.spend > 0).length;
+  const claudeTotalMembers = clMembers.length;
+  const claudeAvgPerActive =
+    claudeActiveMembers > 0 ? claudeTotalSpend / claudeActiveMembers : 0;
+
+  // Copilot Summary
+  const copilotTotalSeats = cpSeatsData.length;
+  const copilotActiveSeats = cpSeatsData.filter(
+    (s) => s.activity === "active"
+  ).length;
+  const copilotInactiveSeats = cpSeatsData.filter(
+    (s) => s.activity === "inactive"
+  ).length;
+  const copilotTotalCost = cpSeatsData.reduce(
+    (sum, s) => sum + (s.cost || 0),
+    0
+  );
+  const copilotReclaimable = cpSeatsData
+    .filter((s) => s.activity === "inactive")
+    .reduce((sum, s) => sum + (s.cost || 0), 0);
+
+  // ==========================================
+  // CHART 1: Projected end-of-month spend (Donut)
+  // ==========================================
+  const dl = [],
+    dv = [];
+
+  if (clMembers.length > 0) {
+    dl.push("Claude");
+    dv.push(claudeProjectedSpend);
+  }
+
+  if (cpSeatsData.length > 0) {
+    dl.push("Copilot");
+    dv.push(copilotTotalCost);
+  }
+
+  if (dl.length) {
+    const total = dv.reduce((a, b) => a + b, 0);
+    const cap = document.getElementById("execProjCap");
+
+    // Update Subtitle text
+    if (cap) {
+      cap.textContent =
+        "Total projected: " +
+        money0(total) +
+        " · " +
+        dl.map((l, i) => l + " " + money0(dv[i])).join(" · ");
+    }
+
+    const adoptCanvas = document.getElementById("execAdopt");
+    if (adoptCanvas) {
+      // Destroy previous instance to prevent hover artifacts
+      if (window.execAdoptChart) window.execAdoptChart.destroy();
+
+      window.execAdoptChart = new Chart(adoptCanvas, {
+        type: "doughnut",
+        data: {
+          labels: dl,
+          datasets: [
+            { data: dv, backgroundColor: [colors.claude, colors.copilot] },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "bottom" },
+            tooltip: {
+              callbacks: {
+                label: (c) => c.label + ": " + money0(c.parsed),
+              },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  // ==========================================
+  // CHART 2: Daily Spend (Line Chart)
+  // ==========================================
+  const spendCanvas = document.getElementById("execSpend");
+  if (spendCanvas) {
+    // Destroy previous instance to prevent hover artifacts
+    if (window.execSpendChart) window.execSpendChart.destroy();
+
+    // For daily spend, you'll need to aggregate by date from your data
+    // This is a simplified version showing total spend comparison
+    const chartLabels = ["Current Month"];
+    const claudeDailyData = [claudeTotalSpend];
+    const copilotDailyData = [copilotTotalCost];
+
+    window.execSpendChart = new Chart(spendCanvas, {
+      type: "bar", // Changed to bar since we're showing totals
+      data: {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: "Claude",
+            data: claudeDailyData,
+            backgroundColor: colors.claude + "CC",
+            borderColor: colors.claude,
+            borderWidth: 1,
+          },
+          {
+            label: "Copilot",
+            data: copilotDailyData,
+            backgroundColor: colors.copilot + "CC",
+            borderColor: colors.copilot,
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function (value) {
+                return "$" + value.toLocaleString();
+              },
+            },
+          },
+        },
+        plugins: {
+          legend: { position: "bottom" },
+          tooltip: {
+            callbacks: {
+              label: (c) => c.dataset.label + ": " + money2(c.parsed.y),
+            },
+          },
+        },
+      },
+    });
+  }
+
+  // ==========================================
+  // POPULATE STAT CARDS
+  // ==========================================
+
+  // Claude Stats
+  const statTotalSpend = document.getElementById("stat-total-spend");
+  const statTotalMembers = document.getElementById("stat-total-members");
+  const statActiveMembers = document.getElementById("stat-active-members");
+  const statAvgActive = document.getElementById("stat-avg-active");
+  const statSumCaps = document.getElementById("stat-sum-caps");
+  const statCustomCaps = document.getElementById("stat-custom-caps");
+
+  if (statTotalSpend) statTotalSpend.textContent = money2(claudeTotalSpend);
+  if (statTotalMembers)
+    statTotalMembers.textContent = `${claudeTotalMembers} members in org`;
+  if (statActiveMembers) statActiveMembers.textContent = claudeActiveMembers;
+  if (statAvgActive) statAvgActive.textContent = money2(claudeAvgPerActive);
+
+  const totalCaps = clMembers.reduce((sum, m) => sum + (m.cap || 0), 0);
+  const customCapsCount = clMembers.filter((m) => m.cap > 0).length;
+
+  if (statSumCaps) statSumCaps.textContent = money0(totalCaps);
+  if (statCustomCaps)
+    statCustomCaps.textContent = `${customCapsCount} custom caps`;
+
+  // Copilot Stats
+  const cpTotalSeats = document.getElementById("cp-total-seats");
+  const cpActiveSeats = document.getElementById("cp-active-seats");
+  const cpInactiveSeats = document.getElementById("cp-inactive-seats");
+  const cpMonthlyCost = document.getElementById("cp-monthly-cost");
+  const cpAnnualCost = document.getElementById("cp-annual-cost");
+  const cpInactiveCost = document.getElementById("cp-inactive-cost");
+  const cpReclaimableVal = document.getElementById("cp-reclaimable-val");
+  const cpReclaimableAnnual = document.getElementById("cp-reclaimable-annual");
+
+  if (cpTotalSeats) cpTotalSeats.textContent = copilotTotalSeats;
+  if (cpActiveSeats) cpActiveSeats.textContent = copilotActiveSeats;
+  if (cpInactiveSeats) {
+    cpInactiveSeats.textContent = copilotInactiveSeats;
+    cpInactiveSeats.className =
+      copilotInactiveSeats > 0
+        ? "text-2xl font-bold mt-1 tracking-tight text-red-600"
+        : "text-2xl font-bold mt-1 tracking-tight text-gray-900";
+  }
+  if (cpMonthlyCost) cpMonthlyCost.textContent = money0(copilotTotalCost);
+  if (cpAnnualCost)
+    cpAnnualCost.textContent = money0(copilotTotalCost * 12) + " / yr";
+  if (cpInactiveCost)
+    cpInactiveCost.textContent = "Costing " + money0(copilotReclaimable);
+  if (cpReclaimableVal)
+    cpReclaimableVal.textContent = money0(copilotReclaimable);
+  if (cpReclaimableAnnual)
+    cpReclaimableAnnual.textContent = money0(copilotReclaimable * 12) + " / yr";
+}
+function renderWisprFlow(wisprData) {
+  // Helper formatters
+  const num = (n) => (n == null ? "—" : Number(n).toLocaleString("en-US"));
+
+  // KPI Card Generator (Tailwind version)
+  function kpiCard(label, value, hint, valueColor = "") {
+    return `
+      <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+        <div>
+          <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">${label}</div>
+          <div class="text-2xl font-bold mt-1 tracking-tight ${
+            valueColor || "text-gray-900"
+          }">${value}</div>
+        </div>
+        ${hint ? `<div class="text-xs text-gray-500 mt-2">${hint}</div>` : ""}
+      </div>
+    `;
+  }
+
+  const WF = wisprData;
+
+  if (WF && WF.members) {
+    // Show Wispr section
+    const section = document.getElementById("wispr-section");
+    if (section) section.classList.remove("hidden");
+
+    // Build info line with snapshot date
+    const lineElement = document.getElementById("execWisprLine");
+    if (lineElement) {
+      const snapshotDate = WF.as_of
+        ? new Date(WF.as_of).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          })
+        : null;
+
+      lineElement.innerHTML = `
+        <span>${num(WF.members)} members</span>
+        <span class="mx-1.5">·</span>
+        <span>${num(WF.active_seats)} active seats</span>
+        <span class="mx-1.5">·</span>
+        <span>${num(
+          WF.words_dictated_all_time
+        )} words dictated (all time)</span>
+        ${
+          snapshotDate
+            ? `<span class="mx-1.5">·</span><span>snapshot ${snapshotDate}</span>`
+            : ""
+        }
+      `;
+    }
+
+    // Calculate weekly trend
+    const delta = WF.words_delta_pct;
+    const trendValue =
+      delta != null ? (delta >= 0 ? "+" : "") + delta.toFixed(1) + "%" : "—";
+    const trendColor =
+      delta != null
+        ? delta >= 0
+          ? "text-green-600"
+          : "text-red-600"
+        : "text-gray-900";
+
+    // Calculate average words per user
+    const avgWordsPerUser =
+      WF.members > 0 ? Math.round(WF.words_dictated_all_time / WF.members) : 0;
+
+    // Calculate utilization rate
+    const utilizationRate =
+      WF.members > 0 ? Math.round((WF.active_seats / WF.members) * 100) : 0;
+
+    // Populate KPI Cards
+    const wisprContainer = document.getElementById("execWispr");
+    if (wisprContainer) {
+      wisprContainer.innerHTML =
+        kpiCard(
+          "Users",
+          num(WF.members),
+          `${num(WF.active_seats)} active (${utilizationRate}%)`
+        ) +
+        kpiCard(
+          "Words Dictated",
+          num(WF.words_dictated_all_time),
+          `~${num(avgWordsPerUser)} words/user (all time)`
+        ) +
+        kpiCard(
+          "Weekly Trend",
+          trendValue,
+          WF.words_delta_window || "weekly comparison",
+          trendColor
+        ) +
+        kpiCard(
+          "Billed Seats",
+          num(WF.billed_seats),
+          `${utilizationRate}% utilization`
+        );
+    }
+
+    // Render Top Apps Chart (if data available)
+    const appsCanvas = document.getElementById("execWisprApps");
+    const appsCard = document.getElementById("execWisprAppsCard");
+
+    // Check if we have app data
+    if (WF.top_apps && WF.top_apps.length > 0 && appsCanvas) {
+      if (appsCard) appsCard.classList.remove("hidden");
+
+      // Destroy previous chart instance
+      if (window.wisprAppsChart) window.wisprAppsChart.destroy();
+
+      const apps = WF.top_apps.slice(0, 10);
+
+      // Wispr Flow brand color palette
+      const palette = [
+        "#009A2F",
+        "#00B37E",
+        "#006B20",
+        "#00C853",
+        "#1B5E20",
+        "#2E7D32",
+        "#388E3C",
+        "#43A047",
+        "#4CAF50",
+        "#66BB6A",
+      ];
+
+      window.wisprAppsChart = new Chart(appsCanvas, {
+        type: "bar",
+        data: {
+          labels: apps.map((a) => a.app),
+          datasets: [
+            {
+              label: "% of dictation",
+              data: apps.map((a) => a.pct),
+              backgroundColor: palette.slice(0, apps.length),
+              borderRadius: 4,
+              borderSkipped: false,
+            },
+          ],
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              beginAtZero: true,
+              max: 100,
+              grid: {
+                color: "#e5e7eb",
+              },
+              ticks: {
+                callback: function (value) {
+                  return value + "%";
+                },
+              },
+            },
+            y: {
+              grid: {
+                display: false,
+              },
+            },
+          },
+          plugins: {
+            legend: {
+              display: false,
+            },
+            tooltip: {
+              callbacks: {
+                label: (c) => `${c.label}: ${c.parsed.x}% of dictation`,
+              },
+            },
+          },
+        },
+      });
+
+      // Add empty state message if needed
+    } else if (appsCanvas) {
+      // No app data - show placeholder
+      if (appsCard) {
+        appsCard.classList.remove("hidden");
+        const ctx = appsCanvas.getContext("2d");
+        if (window.wisprAppsChart) window.wisprAppsChart.destroy();
+
+        // Show "no data" message on canvas
+        ctx.clearRect(0, 0, appsCanvas.width, appsCanvas.height);
+        ctx.font = "14px Inter, system-ui, sans-serif";
+        ctx.fillStyle = "#9CA3AF";
+        ctx.textAlign = "center";
+        ctx.fillText(
+          "No app data available",
+          appsCanvas.width / 2,
+          appsCanvas.height / 2
+        );
+      }
+    }
+  } else {
+    // Hide entire Wispr section if no data
+    const section = document.getElementById("wispr-section");
+    if (section) section.classList.add("hidden");
+  }
+}
 
 // Helper to update elements safely without crashing
 function safeUpdate(id, value) {
@@ -173,19 +821,54 @@ const pal = [
   "#0284c7",
 ];
 
-function switchTab(t) {
-  document
-    .querySelectorAll(".tab")
-    .forEach((x) => x.classList.remove("active"));
-  document
-    .querySelectorAll(".page")
-    .forEach((x) => x.classList.remove("active"));
-  if (t === "claude") {
-    document.querySelectorAll(".tab")[0].classList.add("active");
-  } else {
-    document.querySelectorAll(".tab")[1].classList.add("active");
+// function switchTab(t) {
+//   document
+//     .querySelectorAll(".tab")
+//     .forEach((x) => x.classList.remove("active"));
+//   document
+//     .querySelectorAll(".page")
+//     .forEach((x) => x.classList.remove("active"));
+//   if (t === "claude") {
+//     document.querySelectorAll(".tab")[0].classList.add("active");
+//   } else {
+//     document.querySelectorAll(".tab")[1].classList.add("active");
+//   }
+//   $("page-" + t).classList.add("active");
+// }
+function switchTab(targetPageId) {
+  // 1. Find all elements with the class 'page' and hide them
+  const allPages = document.querySelectorAll(".page");
+  allPages.forEach((page) => {
+    page.style.display = "none";
+    page.classList.remove("active");
+  });
+
+  // 2. Remove 'active' styling from all tab buttons
+  const allTabs = document.querySelectorAll(".tab");
+  allTabs.forEach((tab) => {
+    tab.classList.remove("active");
+  });
+
+  // 3. Find the target page and show it
+  const targetPage = document.getElementById(targetPageId);
+  if (targetPage) {
+    targetPage.style.display = "block";
+    targetPage.classList.add("active");
   }
-  $("page-" + t).classList.add("active");
+
+  // 4. Highlight the button that was clicked
+  // We determine which button to highlight based on the passed ID
+  let buttonClass = "";
+  if (targetPageId === "page-exec") buttonClass = "exec";
+  if (targetPageId === "page-claude") buttonClass = "cl";
+  if (targetPageId === "page-copilot") buttonClass = "cp";
+
+  if (buttonClass) {
+    const activeBtn = document.querySelector(`.tab.${buttonClass}`);
+    if (activeBtn) {
+      activeBtn.classList.add("active");
+    }
+  }
 }
 function setTg(gid, btn) {
   document
@@ -2222,9 +2905,21 @@ async function fetchRealTimeDashboardData() {
       }));
       // REMOVED duplicate renderCopilot() from here
     }
-
-    // 1. Update the UI Stats (Dashboard Cards)
+    if (payload.wispr) {
+      console.log(`wispr : ${JSON.stringify(payload.wispr)}`);
+      const wisprData = {
+        as_of: "2026-06-24",
+        members: 144,
+        active_seats: 106,
+        billed_seats: 106,
+        words_dictated_all_time: 249490,
+        words_delta_pct: 46.71,
+        words_delta_window: "prior 7 days",
+      };
+      renderWisprFlow(payload.wispr);
+    }
     if (typeof clMembers !== "undefined") {
+      // 1. Update the UI Stats (Dashboard Cards)
       updateClaudeDashboard(clMembers);
       updateTokenWarnings(clMembers);
     }
@@ -2246,6 +2941,7 @@ async function fetchRealTimeDashboardData() {
     // FIXED: Renamed to match the User Bar Chart we just created!
     renderUserSpendChart(cpSeatsData, payload?.org_ai_credits);
     console.log(`org_ai_credits`, payload);
+    renderExecutiveCharts(clMembers, cpSeatsData);
 
     // 3. Trigger the "All" view to populate the Table and Stats automatically
     // filterSeats("all", null);

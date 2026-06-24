@@ -291,7 +291,14 @@ const dumpDebugInfo = async (page, label) => {
 //   }
 // };
 
-export const scrapeWisprData = async (email, pass) => {
+export const scrapeWisprData = async (email, pass, isRefreshData = false) => {
+  if (!email || !pass) return null;
+  // 1. Try file cache first
+  const cached = readCache(WISPR_CACHE_FILE);
+  if (cached) {
+    logger.debug("Wispr: loaded from file cache");
+    return cached;
+  }
   logger.info("Initializing Wispr scraper...");
   const browser = await puppeteer.launch(getBrowserConfig(true));
   const page = await browser.newPage();
@@ -500,7 +507,7 @@ export const scrapeWisprData = async (email, pass) => {
     try {
       if (!fs.existsSync(CACHE_DIR))
         fs.mkdirSync(CACHE_DIR, { recursive: true });
-      await writeCache(WISPR_CACHE_FILE, wisprData);
+      writeCache(WISPR_CACHE_FILE, wisprData);
       logger.info(
         `Cached scraped data to ${path.join(CACHE_DIR, WISPR_CACHE_FILE)}`
       );

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1.0" />
     <title>AI Usage Dashboard · Zyte</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
       :root {
         --bg: #f4f0f5;
@@ -761,23 +762,424 @@
 
     <!-- <div class="tabs">
       <button class="tab active cl" onclick="switchTab('claude')">
-        Claude <span class="tab-badge">204 members</span>
-      </button>
-      <button class="tab cp" onclick="switchTab('copilot')">
-        Copilot <span class="tab-badge">163 seats</span>
-      </button>
-    </div> -->
-    <div class="tabs">
-      <button class="tab active cl" onclick="switchTab('claude')">
         Claude <span class="tab-badge" id="tab-count-cl">— members</span>
       </button>
       <button class="tab cp" onclick="switchTab('copilot')">
         Copilot <span class="tab-badge" id="tab-count-cp">— seats</span>
       </button>
+    </div> -->
+    <div class="tabs">
+      <button class="tab active exec" onclick="switchTab('page-exec')">
+        Executive summary
+      </button>
+      <button class="tab cl" onclick="switchTab('page-claude')">
+        Claude Enterprise
+        <span class="tab-badge" id="tab-count-cl">— members</span>
+      </button>
+      <button class="tab cp" onclick="switchTab('page-copilot')">
+        <!-- Assuming your copilot ID is page-copilot -->
+        GitHub Copilot <span class="tab-badge" id="tab-count-cp">— seats</span>
+      </button>
+    </div>
+
+    <!-- ==================== EXECUTIVE SUMMARY================== -->
+    <div id="page-exec" class="page active" style="display: block">
+      <!-- <div class="stat-bar">
+          <div class="stat">
+            <div class="stat-label">Total MTD Spend</div>
+            <div
+              class="stat-value"
+              id="stat-total-spend"
+              style="color: var(--cl)"
+            >
+              —
+            </div>
+            <div class="stat-sub" id="stat-total-members">— members in org</div>
+            <div class="stat-delta delta-up" id="stat-spend-delta"></div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Active Members</div>
+            <div class="stat-value" id="stat-active-members">—</div>
+            <div class="stat-sub">spend > 0 this month</div>
+            <div
+              class="stat-delta"
+              id="stat-inactive-members"
+              style="color: var(--muted)"
+            >
+              —
+            </div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Avg / Active</div>
+            <div class="stat-value" id="stat-avg-active">—</div>
+            <div class="stat-sub">per active member</div>
+          </div>
+          <div class="stat">
+            <div class="stat-label">Sum of Member Caps</div>
+            <div class="stat-value" id="stat-sum-caps">—</div>
+            <div class="stat-sub" id="stat-custom-caps">—</div>
+          </div>
+          <div class="stat" style="display: none">
+            <div class="stat-label">Org Spend Limit</div>
+            <div class="stat-value" id="stat-org-limit">—</div>
+            <div class="stat-sub" id="stat-org-used">—</div>
+          </div>
+        </div> -->
+
+      <div class="w-full">
+        <h3
+          class="text-xs font-bold uppercase tracking-wider text-purple-700 mt-6 mb-3 ml-2"
+        >
+          Claude Enterprise · month to date
+        </h3>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ml-2 mr-2"
+        >
+          <!-- Stat Card 1 -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between"
+          >
+            <div>
+              <div
+                class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1"
+              >
+                Total MTD Spend
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-purple-700"
+                id="stat-total-spend"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1" id="stat-total-members">
+                — members in org
+              </div>
+            </div>
+            <div
+              class="text-xs font-medium text-green-600 mt-2"
+              id="stat-spend-delta"
+            ></div>
+          </div>
+
+          <!-- Stat Card 2 -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between"
+          >
+            <div>
+              <div
+                class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1"
+              >
+                Active Members
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="stat-active-members"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1">spend > 0 this month</div>
+            </div>
+            <div
+              class="text-xs font-medium text-gray-500 mt-2"
+              id="stat-inactive-members"
+            >
+              —
+            </div>
+          </div>
+
+          <!-- Stat Card 3 -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between"
+          >
+            <div>
+              <div
+                class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1"
+              >
+                Avg / Active
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="stat-avg-active"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1">per active member</div>
+            </div>
+          </div>
+
+          <!-- Stat Card 4 -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col justify-between"
+          >
+            <div>
+              <div
+                class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1"
+              >
+                Sum of Member Caps
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="stat-sum-caps"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1" id="stat-custom-caps">
+                —
+              </div>
+            </div>
+          </div>
+
+          <!-- Stat Card 5 (Hidden) -->
+          <div
+            class="hidden bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex-col justify-between"
+          >
+            <div>
+              <div
+                class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-1"
+              >
+                Org Spend Limit
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="stat-org-limit"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1" id="stat-org-used">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        id="execClaude"
+      ></div> -->
+
+      <div class="w-full">
+        <h3
+          class="text-xs font-bold uppercase tracking-wider text-indigo-900 mt-8 mb-3 ml-2"
+        >
+          GitHub Copilot · last 28 days
+        </h3>
+        <!-- Stat bar -->
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 ml-2 mr-2"
+        >
+          <!-- Total Seats -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div
+              class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+            >
+              Total Seats
+            </div>
+            <div
+              class="text-2xl font-bold mt-1 tracking-tight text-gray-900"
+              id="cp-total-seats"
+            >
+              —
+            </div>
+            <div class="text-xs text-gray-500 mt-2" id="cp-unmapped-sub">
+              — unmapped
+            </div>
+          </div>
+
+          <!-- Active Seats -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div
+              class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+            >
+              Active (30D)
+            </div>
+            <div class="text-2xl font-bold mt-1 tracking-tight text-gray-900">
+              <span id="cp-active-seats"></span>
+            </div>
+            <div class="text-xs text-gray-500 mt-2">used in last 30 days</div>
+          </div>
+
+          <!-- Inactive Seats -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div
+              class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+            >
+              Inactive
+            </div>
+            <div
+              class="text-2xl font-bold mt-1 tracking-tight text-red-600"
+              id="cp-inactive-seats"
+            >
+              —
+            </div>
+            <div class="text-xs text-gray-500 mt-2">no activity 30+ days</div>
+            <div
+              class="text-xs text-green-600 mt-1 delta-up"
+              id="cp-inactive-cost"
+            >
+              Costing —
+            </div>
+          </div>
+
+          <!-- Total Cost -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div
+              class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+            >
+              Current Month Spend
+            </div>
+            <div
+              class="text-2xl font-bold mt-1 tracking-tight text-gray-900"
+              id="cp-monthly-cost"
+            >
+              —
+            </div>
+            <div class="text-xs text-gray-500 mt-2" id="cp-annual-cost">
+              — / yr
+            </div>
+          </div>
+
+          <!-- Reclaimable -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow hidden"
+          >
+            <div
+              class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+            >
+              Reclaimable / Mo
+            </div>
+            <div
+              class="text-2xl font-bold mt-1 tracking-tight text-amber-600"
+              id="cp-reclaimable-val"
+            >
+              —
+            </div>
+            <div class="text-xs text-gray-500 mt-2" id="cp-reclaimable-annual">
+              — / yr
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+        id="execCopilot"
+      ></div>
+
+      <!-- <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <h2 class="text-sm font-semibold mb-4 text-gray-900">
+            Daily spend · Claude vs. Copilot
+          </h2>
+          <canvas id="execSpend"></canvas>
+        </div>
+        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
+          <h2 class="text-sm font-semibold mb-1 text-gray-900">
+            Projected end-of-month spend
+          </h2>
+          <div class="text-xs text-gray-500 mb-4" id="execProjCap">—</div>
+          <canvas id="execAdopt"></canvas>
+        </div>
+      </div> -->
+      <!-- Added Grid Wrapper -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
+        <!-- Block 1: Daily Spend -->
+        <div
+          class="hidden bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-sm font-semibold text-gray-900">
+              Daily spend · Claude vs. Copilot
+            </h2>
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full bg-[#B02CCE]"></div>
+                <span class="text-xs text-gray-500">Claude</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <div class="w-3 h-3 rounded-full bg-[#181E5A]"></div>
+                <span class="text-xs text-gray-500">Copilot</span>
+              </div>
+            </div>
+          </div>
+          <div class="relative w-full h-[280px] sm:h-[300px] lg:h-[320px]">
+            <canvas id="execSpend" class="w-full h-full"></canvas>
+          </div>
+        </div>
+
+        <!-- Block 2: Projected Spend (Removed mt-4) -->
+        <div
+          class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-sm font-semibold text-gray-900">
+              Projected end-of-month spend
+            </h2>
+            <svg
+              class="w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+          </div>
+          <div
+            class="text-xs text-gray-500 mb-4 flex items-center gap-2"
+            id="execProjCap"
+          >
+            <span
+              class="inline-block w-2 h-2 rounded-full bg-gray-300 animate-pulse"
+            ></span>
+            <span>Loading...</span>
+          </div>
+          <div class="relative w-full h-[280px] sm:h-[300px] lg:h-[320px]">
+            <canvas id="execAdopt" class="w-full h-full"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wispr Flow Section -->
+      <div id=" wispr-section" class="mt-6">
+        <h3
+          class="ml-2 mr-2 text-lg font-semibold text-[#009A2F] mb-1"
+          id="execWisprTitle"
+        >
+          Wispr Flow · voice dictation
+        </h3>
+        <div class="ml-2 mr-2text-sm text-gray-500 mb-4" id="execWisprLine">
+          —
+        </div>
+        <div
+          class="ml-2 mr-2 mb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          id="execWispr"
+        ></div>
+        <!-- <div
+          class="hidden mt-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          id="execWisprAppsCard"
+        >
+          <h2 class="text-sm font-semibold mb-4 text-gray-900">
+            Top apps by dictation
+          </h2>
+          <div class="relative w-full h-[300px]">
+            <canvas id="execWisprApps"></canvas>
+          </div>
+        </div> -->
+      </div>
     </div>
 
     <!-- ═══════════════════════════════ CLAUDE ═══════════════════════════════ -->
-    <div id="page-claude" class="page active">
+    <div id="page-claude" class="page">
       <div class="main">
         <div class="stat-bar">
           <div class="stat">
