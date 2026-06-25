@@ -288,8 +288,8 @@ function ensureCacheDir() {
 }
 
 // const CACHE_TTL_MS = 1000; // 5 minutes
-const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
-// const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 59 minutes
+// const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 59 minutes
 
 /**
  * Returns cached data if it exists and is younger than CACHE_TTL_MS.

@@ -2908,7 +2908,155 @@ function renderClModelChart(rows) {
     },
   });
 }
+function sortWisprUsersByRole(users) {
+  if (!users || !Array.isArray(users)) return users;
+  const roleOrder = { Admin: 0, Member: 1, Viewer: 2, Billing: 3 };
+  return [...users].sort((a, b) => {
+    const roleA = a.role || "Member";
+    const roleB = b.role || "Member";
+    return (roleOrder[roleA] ?? 99) - (roleOrder[roleB] ?? 99);
+  });
+}
+function renderWisprUsers(wisprUsers) {
+  console.log("🔍 renderWisprUsers called with:", wisprUsers);
 
+  const container = document.getElementById("wispr-user-list");
+  if (!container) {
+    console.error("❌ Container #wispr-user-list not found.");
+    return;
+  }
+
+  if (!wisprUsers) {
+    container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-6">No Wispr users data</div>`;
+    return;
+  }
+
+  if (!Array.isArray(wisprUsers)) {
+    if (wisprUsers.users && Array.isArray(wisprUsers.users)) {
+      wisprUsers = wisprUsers.users;
+    } else {
+      container.innerHTML = `<div class="col-span-full text-center text-gray-400 py-6">Invalid Wispr users data</div>`;
+      return;
+    }
+  }
+
+  if (wisprUsers.length === 0) {
+    container.innerHTML = `
+      <div class="col-span-full text-center text-gray-400 py-8 bg-gray-50 border border-dashed border-gray-300 rounded-lg">
+        No Wispr users found
+      </div>
+    `;
+    return;
+  }
+
+  try {
+    let html = "";
+    wisprUsers.forEach((user, index) => {
+      // Safe data
+      const safeName = user?.name || "Unknown";
+      const safeEmail = user?.email || "";
+      const safeRole = user?.role || "Member";
+      let displayStatus = user?.status || "—";
+
+      // Normalize status
+      const statusLower = displayStatus.toLowerCase();
+      if (statusLower === "trialing") displayStatus = "Trialing";
+      else if (statusLower === "active") displayStatus = "Active";
+      else if (statusLower === "inactive") displayStatus = "Inactive";
+
+      // Badge colors
+      let statusColor = "text-gray-600";
+      let statusBg = "bg-gray-100";
+      if (displayStatus.includes("Active")) {
+        statusColor = "text-green-700";
+        statusBg = "bg-green-100";
+      } else if (displayStatus.includes("Trialing")) {
+        statusColor = "text-amber-700";
+        statusBg = "bg-amber-100";
+      } else if (displayStatus.includes("Inactive")) {
+        statusColor = "text-red-700";
+        statusBg = "bg-red-100";
+      }
+
+      // ---- Avatar logic ----
+      const nameEncoded = encodeURIComponent(safeName);
+      // Get initials (max 2 characters)
+      const initials = safeName
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+
+      // Check if we have a valid image URL
+      let avatarUrl = user?.image_url || user?.avatar || "";
+      const isValidHttp = avatarUrl.match(/^https?:\/\//);
+      const useImage = isValidHttp;
+
+      // Build avatar HTML (either <img> or a placeholder div)
+      let avatarHtml = "";
+      if (useImage) {
+        avatarHtml = `
+          <img
+            src="${avatarUrl}"
+            alt="${safeName}"
+            class="w-8 h-8 rounded-full object-cover border border-gray-200 flex-shrink-0"
+            loading="lazy"
+            onerror="this.onerror=null; this.style.display='none'; this.nextElementSibling.style.display='flex';"
+          />
+          <div class="w-8 h-8 rounded-full bg-[#009A2F] text-white text-xs font-bold flex items-center justify-center border border-gray-200 flex-shrink-0" style="display:none;">
+            ${initials}
+          </div>
+        `;
+      } else {
+        avatarHtml = `
+          <div class="w-8 h-8 rounded-full bg-[#009A2F] text-white text-xs font-bold flex items-center justify-center border border-gray-200 flex-shrink-0">
+            ${initials}
+          </div>
+        `;
+      }
+
+      const uniqueId = `wispr-user-${index}`;
+
+      html += `
+        <div id="${uniqueId}" 
+             class="flex items-center justify-between bg-white border border-gray-200 rounded-lg px-3 py-2.5 shadow-sm hover:shadow-md transition-all duration-200 hover:border-gray-300 w-full min-w-[200px]">
+          
+          <!-- Left: Avatar + Name/Email -->
+          <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <div class="relative flex-shrink-0">
+              ${avatarHtml}
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-semibold text-gray-800 truncate">${safeName}</div>
+              <div class="text-[11px] text-gray-500 truncate">${safeEmail}</div>
+            </div>
+          </div>
+
+          <!-- Right: Status + Role -->
+          <div class="flex items-center gap-2 flex-shrink-0 ml-2">
+            <span class="${statusBg} ${statusColor} text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
+              ${displayStatus}
+            </span>
+            <span class="text-[11px] text-gray-600 font-medium bg-gray-50 px-2 py-0.5 rounded border border-gray-200 whitespace-nowrap">
+              ${safeRole}
+            </span>
+          </div>
+        </div>
+      `;
+    });
+
+    container.innerHTML = html;
+    console.log("✅ Wispr users rendered successfully.");
+  } catch (error) {
+    console.error("❌ Error rendering Wispr users:", error);
+    container.innerHTML = `
+      <div class="col-span-full text-center text-red-500 py-6 bg-red-50 border border-red-200 rounded-lg">
+        Error loading Wispr users. Check console.
+      </div>
+    `;
+  }
+}
 async function fetchRealTimeDashboardData() {
   const refreshBtn = document.getElementById("refresh-icon");
   try {
@@ -3009,6 +3157,8 @@ async function fetchRealTimeDashboardData() {
       console.log(`wispr : ${JSON.stringify(payload.wispr)}`);
 
       renderWisprFlow(payload.wispr);
+      const sortedUsers = sortWisprUsersByRole(payload?.wispr.users);
+      renderWisprUsers(sortedUsers);
       // renderWisprFlow(wisprflow); // !!! Temporary - for testing
     }
     if (typeof clMembers !== "undefined") {
