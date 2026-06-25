@@ -174,6 +174,10 @@
         color: var(--cl);
         border-bottom-color: var(--cl);
       }
+      .tab.active.exec {
+        color: var(--cl);
+        border-bottom-color: var(--cl);
+      }
       .tab.active.cp {
         color: var(--cp);
         border-bottom-color: var(--cp);
@@ -759,15 +763,6 @@
         <span class="pill live" id="data-pill">● Live Data</span>
       </div>
     </header>
-
-    <!-- <div class="tabs">
-      <button class="tab active cl" onclick="switchTab('claude')">
-        Claude <span class="tab-badge" id="tab-count-cl">— members</span>
-      </button>
-      <button class="tab cp" onclick="switchTab('copilot')">
-        Copilot <span class="tab-badge" id="tab-count-cp">— seats</span>
-      </button>
-    </div> -->
     <div class="tabs">
       <button class="tab active exec" onclick="switchTab('page-exec')">
         Executive summary
@@ -784,48 +779,6 @@
 
     <!-- ==================== EXECUTIVE SUMMARY================== -->
     <div id="page-exec" class="page active" style="display: block">
-      <!-- <div class="stat-bar">
-          <div class="stat">
-            <div class="stat-label">Total MTD Spend</div>
-            <div
-              class="stat-value"
-              id="stat-total-spend"
-              style="color: var(--cl)"
-            >
-              —
-            </div>
-            <div class="stat-sub" id="stat-total-members">— members in org</div>
-            <div class="stat-delta delta-up" id="stat-spend-delta"></div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Active Members</div>
-            <div class="stat-value" id="stat-active-members">—</div>
-            <div class="stat-sub">spend > 0 this month</div>
-            <div
-              class="stat-delta"
-              id="stat-inactive-members"
-              style="color: var(--muted)"
-            >
-              —
-            </div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Avg / Active</div>
-            <div class="stat-value" id="stat-avg-active">—</div>
-            <div class="stat-sub">per active member</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Sum of Member Caps</div>
-            <div class="stat-value" id="stat-sum-caps">—</div>
-            <div class="stat-sub" id="stat-custom-caps">—</div>
-          </div>
-          <div class="stat" style="display: none">
-            <div class="stat-label">Org Spend Limit</div>
-            <div class="stat-value" id="stat-org-limit">—</div>
-            <div class="stat-sub" id="stat-org-used">—</div>
-          </div>
-        </div> -->
-
       <div class="w-full">
         <h3
           class="text-xs font-bold uppercase tracking-wider text-purple-700 mt-6 mb-3 ml-2"
@@ -950,10 +903,6 @@
           </div>
         </div>
       </div>
-      <!-- <div
-        class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-        id="execClaude"
-      ></div> -->
 
       <div class="w-full">
         <h3
@@ -1071,22 +1020,6 @@
         id="execCopilot"
       ></div>
 
-      <!-- <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
-        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-          <h2 class="text-sm font-semibold mb-4 text-gray-900">
-            Daily spend · Claude vs. Copilot
-          </h2>
-          <canvas id="execSpend"></canvas>
-        </div>
-        <div class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-          <h2 class="text-sm font-semibold mb-1 text-gray-900">
-            Projected end-of-month spend
-          </h2>
-          <div class="text-xs text-gray-500 mb-4" id="execProjCap">—</div>
-          <canvas id="execAdopt"></canvas>
-        </div>
-      </div> -->
-      <!-- Added Grid Wrapper -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
         <!-- Block 1: Daily Spend -->
         <div
@@ -1181,48 +1114,106 @@
     <!-- ═══════════════════════════════ CLAUDE ═══════════════════════════════ -->
     <div id="page-claude" class="page">
       <div class="main">
-        <div class="stat-bar">
-          <div class="stat">
-            <div class="stat-label">Total MTD Spend</div>
+        <!-- Stat Bar - Tailwind Styled -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Stat 1: Total MTD Spend -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Total MTD Spend
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-purple-700"
+                id="cl-stat-total-spend"
+              >
+                —
+              </div>
+              <div
+                class="text-xs text-gray-500 mt-1"
+                id="cl-stat-total-members"
+              >
+                — members in org
+              </div>
+            </div>
             <div
-              class="stat-value"
-              id="stat-total-spend"
-              style="color: var(--cl)"
+              class="text-xs font-medium text-green-600 mt-2"
+              id="cl-stat-spend-delta"
+            ></div>
+          </div>
+
+          <!-- Stat 2: Active Members -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Active Members
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="cl-stat-active-members"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1">spend > 0 this month</div>
+            </div>
+            <div
+              class="text-xs font-medium text-gray-500 mt-2"
+              id="cl-stat-inactive-members"
             >
               —
             </div>
-            <div class="stat-sub" id="stat-total-members">— members in org</div>
-            <div class="stat-delta delta-up" id="stat-spend-delta"></div>
           </div>
-          <div class="stat">
-            <div class="stat-label">Active Members</div>
-            <div class="stat-value" id="stat-active-members">—</div>
-            <div class="stat-sub">spend > 0 this month</div>
-            <div
-              class="stat-delta"
-              id="stat-inactive-members"
-              style="color: var(--muted)"
-            >
-              —
+
+          <!-- Stat 3: Avg / Active -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Avg / Active
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="cl-stat-avg-active"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1">per active member</div>
             </div>
           </div>
-          <div class="stat">
-            <div class="stat-label">Avg / Active</div>
-            <div class="stat-value" id="stat-avg-active">—</div>
-            <div class="stat-sub">per active member</div>
-          </div>
-          <div class="stat">
-            <div class="stat-label">Sum of Member Caps</div>
-            <div class="stat-value" id="stat-sum-caps">—</div>
-            <div class="stat-sub" id="stat-custom-caps">—</div>
-          </div>
-          <div class="stat" style="display: none">
-            <div class="stat-label">Org Spend Limit</div>
-            <div class="stat-value" id="stat-org-limit">—</div>
-            <div class="stat-sub" id="stat-org-used">—</div>
+
+          <!-- Stat 4: Sum of Member Caps -->
+          <div
+            class="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Sum of Member Caps
+              </div>
+              <div
+                class="text-2xl font-bold tracking-tight text-gray-900"
+                id="cl-stat-sum-caps"
+              >
+                —
+              </div>
+              <div class="text-xs text-gray-500 mt-1" id="cl-stat-custom-caps">
+                —
+              </div>
+            </div>
           </div>
         </div>
-
+        <!-- ... and so on for org limit etc. -->
         <div class="card">
           <div class="card-head">
             <div>
@@ -1564,55 +1555,102 @@
         </div>
 
         <!-- Stat bar -->
-        <div class="stat-bar">
-          <!-- Total Seats -->
-          <div class="stat">
-            <div class="stat-label">Total Seats</div>
-            <div class="stat-value" id="cp-total-seats">—</div>
-            <div class="stat-sub" id="cp-unmapped-sub">— unmapped</div>
-          </div>
-          <!-- Active Seats -->
-          <div class="stat">
-            <div class="stat-label">Active (30D)</div>
-
-            <div class="stat-value">
-              <span id="cp-active-seats"></span>
-            </div>
-
-            <div class="stat-sub">used in last 30 days</div>
-          </div>
-          <!-- Inactive Seats -->
-          <div class="stat">
-            <div class="stat-label">Inactive</div>
-            <div
-              class="stat-value"
-              style="color: var(--red)"
-              id="cp-inactive-seats"
-            >
-              —
-            </div>
-            <div class="stat-sub">no activity 30+ days</div>
-            <div class="stat-delta delta-up" id="cp-inactive-cost">
-              Costing —
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <!-- Stat 1: Total Seats -->
+          <div
+            class="cp-stat-card bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="cp-stat-label text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Total Seats
+              </div>
+              <div
+                class="cp-stat-value text-2xl font-bold tracking-tight text-gray-900"
+                id="cpd-total-seats"
+              >
+                —
+              </div>
+              <div
+                class="cp-stat-sub text-xs text-gray-500 mt-1"
+                id="cpd-unmapped-sub"
+              >
+                — unmapped
+              </div>
             </div>
           </div>
-          <!-- Total Cost -->
-          <div class="stat">
-            <div class="stat-label">Current Month Spend</div>
-            <div class="stat-value" id="cp-monthly-cost">—</div>
-            <div class="stat-sub" id="cp-annual-cost">— / yr</div>
-          </div>
-          <!-- Reclaimable -->
-          <div class="stat" style="display: none">
-            <div class="stat-label">Reclaimable / Mo</div>
-            <div
-              class="stat-value"
-              style="color: var(--amber)"
-              id="cp-reclaimable-val"
-            >
-              —
+          <!-- Stat 2: Active Seats -->
+          <div
+            class="cp-stat-card bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="cp-stat-label text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Active (30D)
+              </div>
+              <div
+                class="cp-stat-value text-2xl font-bold tracking-tight text-gray-900"
+                id="cpd-active-seats"
+              >
+                —
+              </div>
+              <div class="cp-stat-sub text-xs text-gray-500 mt-1">
+                used in last 30 days
+              </div>
             </div>
-            <div class="stat-sub" id="cp-reclaimable-annual">— / yr</div>
+          </div>
+          <!-- Stat 3: Inactive Seats -->
+          <div
+            class="cp-stat-card bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="cp-stat-label text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Inactive
+              </div>
+              <div
+                class="cp-stat-value text-2xl font-bold tracking-tight text-red-600"
+                id="cpd-inactive-seats"
+              >
+                —
+              </div>
+              <div class="cp-stat-sub text-xs text-gray-500 mt-1">
+                no activity 30+ days
+              </div>
+              <div
+                class="cp-stat-delta text-xs font-medium text-green-600 mt-2"
+                id="cpd-inactive-cost"
+              >
+                Costing —
+              </div>
+            </div>
+          </div>
+          <!-- Stat 4: Current Month Spend -->
+          <div
+            class="cp-stat-card bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div>
+              <div
+                class="cp-stat-label text-gray-500 text-xs font-semibold uppercase tracking-wider"
+              >
+                Current Month Spend
+              </div>
+              <div
+                class="cp-stat-value text-2xl font-bold tracking-tight text-gray-900"
+                id="cpd-monthly-cost"
+              >
+                —
+              </div>
+              <div
+                class="cp-stat-sub text-xs text-gray-500 mt-1"
+                id="cpd-annual-cost"
+              >
+                — / yr
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1891,6 +1929,6 @@
       </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="./script.js"></script>
   </body>
 </html>

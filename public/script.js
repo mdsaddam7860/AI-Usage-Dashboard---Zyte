@@ -1,6 +1,57 @@
 // ─────────────────────────────────────────────────────
 // 1. GLOBAL DATA VARIABLES (Start Empty)
 // ─────────────────────────────────────────────────────
+const wisprflow = {
+  as_of: "2026-06-23",
+  members: 144,
+  active_seats: 106,
+  billed_seats: 106,
+  words_dictated_all_time: 249490,
+  words_delta_pct: 46.71,
+  words_delta_window: "prior 7 days",
+  top_apps: [
+    {
+      app: "Slack",
+      pct: 22,
+    },
+    {
+      app: "Chrome",
+      pct: 17,
+    },
+    {
+      app: "Notion",
+      pct: 14,
+    },
+    {
+      app: "Gmail",
+      pct: 11,
+    },
+    {
+      app: "Linear",
+      pct: 10,
+    },
+    {
+      app: "VS Code",
+      pct: 8,
+    },
+    {
+      app: "Figma",
+      pct: 6,
+    },
+    {
+      app: "Zoom",
+      pct: 5,
+    },
+    {
+      app: "Outlook",
+      pct: 4,
+    },
+    {
+      app: "Safari",
+      pct: 3,
+    },
+  ],
+};
 
 let cpSeatsData = [];
 
@@ -347,6 +398,13 @@ function populateExecutiveSummary() {
   }
 }
 function renderExecutiveCharts(clMembers, cpSeatsData) {
+  // console.log(
+  //   `Rendering Executive Charts for ${JSON.stringify(
+  //     clMembers,
+  //     null,
+  //     2
+  //   )} Claude members and ${JSON.stringify(cpSeatsData, null, 2)} Copilot seats`
+  // );
   // 1. Helper formatting and colors
   const money0 = (n) =>
     n == null
@@ -392,6 +450,18 @@ function renderExecutiveCharts(clMembers, cpSeatsData) {
   const copilotReclaimable = cpSeatsData
     .filter((s) => s.activity === "inactive")
     .reduce((sum, s) => sum + (s.cost || 0), 0);
+
+  // NEW: Unmapped seats — a seat with no matched Claude member.
+  // Defensive check across the common field names a mapping step might use.
+  // TODO: replace with the exact field name once confirmed, e.g.:
+  //   const copilotUnmapped = cpSeatsData.filter((s) => !s.mapped).length;
+  const copilotUnmapped = cpSeatsData.filter((s) => {
+    if (typeof s.mapped === "boolean") return s.mapped === false;
+    if ("mapped" in s) return s.mapped == null;
+    return (
+      !s.claude_member_id && !s.member_email && !s.matched_member && !s.assignee
+    );
+  }).length;
 
   // ==========================================
   // CHART 1: Projected end-of-month spend (Donut)
@@ -538,6 +608,7 @@ function renderExecutiveCharts(clMembers, cpSeatsData) {
 
   // Copilot Stats
   const cpTotalSeats = document.getElementById("cp-total-seats");
+  const cpUnmappedSub = document.getElementById("cp-unmapped-sub"); // NEW
   const cpActiveSeats = document.getElementById("cp-active-seats");
   const cpInactiveSeats = document.getElementById("cp-inactive-seats");
   const cpMonthlyCost = document.getElementById("cp-monthly-cost");
@@ -547,6 +618,7 @@ function renderExecutiveCharts(clMembers, cpSeatsData) {
   const cpReclaimableAnnual = document.getElementById("cp-reclaimable-annual");
 
   if (cpTotalSeats) cpTotalSeats.textContent = copilotTotalSeats;
+  if (cpUnmappedSub) cpUnmappedSub.textContent = `${copilotUnmapped} unmapped`; // NEW
   if (cpActiveSeats) cpActiveSeats.textContent = copilotActiveSeats;
   if (cpInactiveSeats) {
     cpInactiveSeats.textContent = copilotInactiveSeats;
@@ -1655,7 +1727,7 @@ function updateClaudeDashboard(clMembers) {
   set("cl-zero-val", zeroSpendCount);
   set("cl-zero-sub", `${zeroSpendCount} users have seats but $0 spend`);
 
-  // 5. Inject Stat Bar Data
+  // 5. Stat Bar Data for Executive Summary
   set(
     "stat-total-spend",
     `$${totalSpend.toLocaleString(undefined, {
@@ -1664,13 +1736,22 @@ function updateClaudeDashboard(clMembers) {
     })}`
   );
   set("stat-total-members", `${clMembers.length} members in org`);
-  set("stat-active-members", `${activeCount} / ${clMembers.length}`);
+  set("stat-active-members", `${activeCount}`); // just the number, not fraction
   set("stat-inactive-members", `${inactiveCount} inactive this month`);
   set("stat-avg-active", `$${avgActive.toFixed(2)}`);
   set("stat-sum-caps", `$${totalCaps.toLocaleString()}`);
   set("stat-custom-caps", `${capsCount} custom per-person limits`);
 
-  // 6. Generic UI Updates
+  // 5b. Stat Bar Data for Claude Tab (with cl- prefix)
+  set("cl-stat-total-spend", `$${totalSpend.toFixed(2)}`);
+  set("cl-stat-total-members", `${clMembers.length} members in org`);
+  set("cl-stat-active-members", `${activeCount}`);
+  set("cl-stat-inactive-members", `${inactiveCount} inactive this month`);
+  set("cl-stat-avg-active", `$${avgActive.toFixed(2)}`);
+  set("cl-stat-sum-caps", `$${totalCaps.toLocaleString()}`);
+  set("cl-stat-custom-caps", `${capsCount} custom caps`);
+
+  // 6. Other UI updates
   set("cl-members-count", `Members (${clMembers.length})`);
   set("tab-count-cl", `${clMembers.length} members`);
 }
@@ -1710,8 +1791,8 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
 
   // ============ DEBUG START ============
   console.log("=== updateCopilotDashboard DEBUG ===");
-  console.log("cpSeatsData count:", cpSeatsData.length);
-  console.log("cpRows count:", cpRows.length);
+  console.log("cpSeatsData count:", cpSeatsData[0]);
+  console.log("cpRows count:", cpRows[0]);
 
   const set = (id, val) => {
     const el = document.getElementById(id);
@@ -1772,7 +1853,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
   const userToEditorMap = {};
   cpSeatsData.forEach((s) => {
     if (s.user && (s.last_editor || s.editor)) {
-      const normalized = getCleanEditorName(s.last_editor || s.editor); // <-- UPDATED HERE
+      const normalized = normalizeEditor(s.last_editor || s.editor); // <-- UPDATED HERE
       if (normalized !== "Unknown") {
         userToEditorMap[s.user] = normalized;
       }
@@ -1802,8 +1883,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
 
       // Dominant Editor
       let editor =
-        userToEditorMap[r.user] ||
-        getCleanEditorName(r.last_editor || r.editor); // <-- UPDATED HERE
+        userToEditorMap[r.user] || normalizeEditor(r.last_editor || r.editor); // <-- UPDATED HERE
 
       if (activity > 0) {
         if (editor !== "Unknown") {
@@ -1921,6 +2001,26 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
 
   set("never-used-val", neverUsedCount);
   set("never-used-sub", "Immediate reclaim candidates");
+
+  // NEW: Stat bar (Total / Active / Inactive / Spend)
+  const unmappedCount = cpSeatsData.filter((s) => s.unmapped).length;
+
+  set("cpd-total-seats", cpSeatsData.length);
+  set("cpd-unmapped-sub", `${unmappedCount} unmapped`);
+
+  set("cpd-active-seats", activeSeats.length);
+
+  set("cpd-inactive-seats", inactive.length);
+  set("cpd-inactive-cost", `Costing $${reclaimableCost.toLocaleString()}`);
+
+  set("cpd-monthly-cost", `$${monthlyCost.toLocaleString()}`);
+  set(
+    "cpd-annual-cost",
+    `$${Math.round(monthlyCost * 12).toLocaleString()} / yr`
+  );
+
+  // const tabBadge = document.getElementById("tab-count-cp");
+  // if (tabBadge) tabBadge.textContent = `${cpSeatsData.length} seats`;
 
   const tabBadge = document.getElementById("tab-count-cp");
   if (tabBadge) tabBadge.textContent = `${cpSeatsData.length} seats`;
@@ -2907,16 +3007,9 @@ async function fetchRealTimeDashboardData() {
     }
     if (payload.wispr) {
       console.log(`wispr : ${JSON.stringify(payload.wispr)}`);
-      const wisprData = {
-        as_of: "2026-06-24",
-        members: 144,
-        active_seats: 106,
-        billed_seats: 106,
-        words_dictated_all_time: 249490,
-        words_delta_pct: 46.71,
-        words_delta_window: "prior 7 days",
-      };
+
       renderWisprFlow(payload.wispr);
+      // renderWisprFlow(wisprflow); // !!! Temporary - for testing
     }
     if (typeof clMembers !== "undefined") {
       // 1. Update the UI Stats (Dashboard Cards)
