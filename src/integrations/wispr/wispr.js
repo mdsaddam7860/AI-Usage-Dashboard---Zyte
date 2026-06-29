@@ -1,9 +1,9 @@
-import fs from "fs";
 import path from "path";
 import axios from "axios";
 import { fileURLToPath } from "url";
 import { readCache, writeCache } from "../../utils/helper.js";
 import { logger } from "../../index.js";
+import { wisprExecutor } from "../../utils/executors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,16 +32,26 @@ function createApiClient(authToken) {
 // Fetch words dictated data
 async function fetchWordsDictated(apiClient) {
   try {
-    const response = await apiClient.get("/insights/words-dictated", {
-      params: {
-        enterprise_id: ENTERPRISE_ID,
+    const response = await wisprExecutor(
+      () => {
+        return apiClient.get("/insights/words-dictated", {
+          params: {
+            enterprise_id: ENTERPRISE_ID,
+          },
+        });
       },
-    });
+      { name: `fetchWordsDictated` }
+    );
 
     logger.info("Successfully fetched words dictated data");
     return response.data;
   } catch (error) {
-    logger.error("Failed to fetch words dictated:", error.message);
+    logger.error("Failed to fetch words dictated:", {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+      response: error?.response?.data,
+      stack: error.stack,
+    });
     throw error;
   }
 }
@@ -49,14 +59,24 @@ async function fetchWordsDictated(apiClient) {
 // Fetch team members
 async function fetchTeamMembers(apiClient) {
   try {
-    const response = await apiClient.get("/members");
+    const response = await wisprExecutor(
+      () => {
+        return apiClient.get("/members");
+      },
+      { name: `fetchTeamMembers` }
+    );
 
     logger.info(
       `Successfully fetched ${response.data.members?.length || 0} team members`
     );
     return response.data;
   } catch (error) {
-    logger.error("Failed to fetch team members:", error.message);
+    logger.error("Failed to fetch team members:", {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+      response: error?.response?.data,
+      stack: error.stack,
+    });
     throw error;
   }
 }
@@ -144,7 +164,12 @@ function storeUsageHistory(usageData, memberStats) {
     writeCache(WISPR_HISTORY_CACHE_FILE, history);
     logger.info(`Stored usage history (${history.length} records)`);
   } catch (error) {
-    logger.error(`Failed to store usage history: ${error.message}`);
+    logger.error(`Failed to store usage history: `, {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+      response: error?.response?.data,
+      stack: error.stack,
+    });
   }
 }
 
@@ -223,7 +248,12 @@ async function fetchWisprData(
 
     return wisprData;
   } catch (error) {
-    logger.error("Failed to fetch Wispr data:", error.message);
+    logger.error("Failed to fetch Wispr data:", {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+      response: error?.response?.data,
+      stack: error.stack,
+    });
 
     // Try to get last cached data as fallback
     const cached = readCache(WISPR_CACHE_FILE);
@@ -277,48 +307,6 @@ function getMembersByStatus(status = null) {
   if (!status) return members;
 
   return members.filter((member) => member.status === status);
-}
-
-// Example usage
-async function main() {
-  const authToken = process.env.WISPR_API_TOKEN;
-
-  if (!authToken) {
-    logger.error("WISPR_API_TOKEN environment variable is required");
-    return;
-  }
-
-  try {
-    // Fetch fresh data (or use cache if recent)
-    const data = await fetchWisprData(authToken);
-
-    if (data) {
-      console.log("\n=== Wispr Data Summary ===");
-      console.log(`Date: ${data.as_of}`);
-      console.log(
-        `Words Dictated: ${data.words_dictated_all_time.toLocaleString()}`
-      );
-      console.log(
-        `Trend: ${data.words_delta_pct}% (${data.words_delta_window})`
-      );
-      console.log(`Members: ${data.members}`);
-      console.log(`Active Seats: ${data.active_seats}`);
-      console.log(`Users: ${data.users.length}`);
-
-      // Example: Get specific data
-      const usageStats = await getWisprUsageStats(authToken);
-      console.log("\nUsage Stats:", usageStats);
-
-      const activeMembers = getMembersByStatus("active");
-      console.log(`Active members: ${activeMembers.length}`);
-
-      // Get usage history
-      const history = getUsageHistory();
-      console.log(`History records: ${history.length}`);
-    }
-  } catch (error) {
-    logger.error("Main execution failed:", error.message);
-  }
 }
 
 // Export functions

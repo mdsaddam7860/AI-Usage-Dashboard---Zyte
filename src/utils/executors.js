@@ -13,8 +13,14 @@ const apiExecutor = createRequestExecutor({
   intervalMs: 1000,
   retries: 2,
 });
+const wisprExecutor = createRequestExecutor({
+  name: "wisprExecutor Executor",
+  rateLimit: 3,
+  intervalMs: 1000,
+  retries: 2,
+});
 
-export { hubspotExecutor, apiExecutor };
+export { hubspotExecutor, apiExecutor, wisprExecutor };
 
 /***!SECTION
  * 3. How you use it (this is the important part)
