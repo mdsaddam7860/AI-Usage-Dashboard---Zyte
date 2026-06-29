@@ -69,4 +69,797 @@ async function extractUsers() {
   return users;
 }
 
-export { extractUsers };
+async function testWisprScrapingWithHTML(htmlString) {
+  console.log("🚀 Starting offline HTML scraping test...");
+
+  // Launch a headless browser for testing
+  const browser = await puppeteer.launch({ headless: "new" });
+  const page = await browser.newPage();
+
+  const wisprData = {
+    words_dictated_all_time: 0,
+    words_delta_pct: 0.0,
+    words_delta_window: "",
+  };
+
+  try {
+    // 1. Inject the raw HTML into the Puppeteer page
+    await page.setContent(htmlString);
+    console.log("📄 HTML injected successfully. Running evaluation...");
+
+    // 2. Run the exact DOM extraction logic
+    const { wordsRaw, trendRaw, isNegative } = await page.evaluate(() => {
+      // Find the card-title that contains "words dictated"
+      const titles = document.querySelectorAll('[data-slot="card-title"]');
+      const titleEl = Array.from(titles).find((el) =>
+        /words dictated/i.test(el.textContent || "")
+      );
+
+      if (!titleEl)
+        return { wordsRaw: null, trendRaw: null, isNegative: false };
+
+      // Move up to the flex container to find the trend icon
+      const flexContainer = titleEl.parentElement;
+
+      const trendIcon = flexContainer?.querySelector(
+        "svg.lucide-trending-up, svg.lucide-trending-down"
+      );
+      let trendText = null;
+      let isNeg = false;
+
+      if (trendIcon) {
+        isNeg = trendIcon.classList.contains("lucide-trending-down");
+        // The text is in a sibling span to the SVG
+        const trendSpan = trendIcon.parentElement.querySelector("span");
+        if (trendSpan) {
+          trendText = trendSpan.textContent;
+        }
+      }
+
+      return {
+        wordsRaw: titleEl.textContent || null,
+        trendRaw: trendText,
+        isNegative: isNeg,
+      };
+    });
+
+    if (!wordsRaw) throw new Error('No element matched "words dictated" text');
+
+    // 3. Parse the extracted text into your data object
+    const wordsMatch = wordsRaw.replace(/,/g, "").match(/\d+/);
+    wisprData.words_dictated_all_time = wordsMatch
+      ? parseInt(wordsMatch[0], 10)
+      : 0;
+
+    if (trendRaw) {
+      const trendMatch = trendRaw.match(/[\d.]+/);
+      const pct = trendMatch ? parseFloat(trendMatch[0]) : 0.0;
+      wisprData.words_delta_pct = isNegative ? -pct : pct;
+
+      const windowMatch = trendRaw.match(/from\s+(.*)/i);
+      if (windowMatch) wisprData.words_delta_window = windowMatch[1].trim();
+    }
+
+    console.log("\n✅ Extraction Success!");
+    console.log("=======================");
+    console.log(JSON.stringify(wisprData, null, 2));
+    console.log("=======================\n");
+
+    return wisprData;
+  } catch (error) {
+    console.error("❌ Extraction Failed:", error.message);
+  } finally {
+    await browser.close();
+  }
+}
+
+// ==========================================
+// RUN THE TEST WITH YOUR RAW HTML
+// ==========================================
+
+const mockWisprHtml = `
+<div
+data-slot="card"
+class="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm pt-0"
+>
+<div
+  data-slot="card-header"
+  class="@container/card-header auto-rows-min grid-rows-[auto_auto] px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6 flex items-center gap-4 space-y-0 border-b pl-6 pr-3 !py-3 sm:flex-row"
+>
+  <div class="flex flex-1 items-center gap-4">
+    <div
+      data-slot="card-title"
+      class="text-xl font-semibold"
+    >
+      314,939 words dictated
+    </div>
+    <div
+      class="flex items-center gap-1 text-[15px] font-semibold leading-5 text-[var(--green-600)]"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="lucide lucide-trending-up size-5"
+        aria-hidden="true"
+      >
+        <path d="M16 7h6v6"></path>
+        <path d="m22 7-8.5 8.5-5-5L2 17"></path></svg
+      ><span>6.1% from prior 7 days</span>
+    </div>
+  </div>
+  <div
+    data-slot="card-action"
+    class="col-start-2 row-span-2 row-start-1 self-start justify-self-end"
+  >
+    <button
+      type="button"
+      role="combobox"
+      aria-controls="radix-:r1c:"
+      aria-expanded="false"
+      aria-autocomplete="none"
+      dir="ltr"
+      data-state="closed"
+      data-slot="select-trigger"
+      data-size="default"
+      class="border-input data-[placeholder]:text-muted-foreground [&amp;_svg:not([class*='text-'])]:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 dark:hover:bg-input/50 flex items-center justify-between gap-2 border bg-transparent px-3 py-2 whitespace-nowrap shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-9 data-[size=sm]:h-8 *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-2 [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 w-[140px] rounded-lg text-[15px] leading-5"
+      aria-label="Select granularity"
+    >
+      <span
+        data-slot="select-value"
+        style="pointer-events: none"
+        >Weekly view</span
+      ><svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="lucide lucide-chevron-down size-4 opacity-50"
+        aria-hidden="true"
+      >
+        <path d="m6 9 6 6 6-6"></path>
+      </svg>
+    </button>
+  </div>
+</div>
+<div data-slot="card-content" class="px-6 pl-0 pr-4 py-0">
+  <div
+    data-slot="chart"
+    data-chart="chart-r1d"
+    class="[&amp;_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&amp;_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&amp;_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&amp;_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&amp;_.recharts-radial-bar-background-sector]:fill-muted [&amp;_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&amp;_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex justify-center text-xs [&amp;_.recharts-dot[stroke='#fff']]:stroke-transparent [&amp;_.recharts-layer]:outline-hidden [&amp;_.recharts-sector]:outline-hidden [&amp;_.recharts-sector[stroke='#fff']]:stroke-transparent [&amp;_.recharts-surface]:outline-hidden aspect-auto h-[250px] w-full"
+  >
+    <style>
+      [data-chart="chart-r1d"] {
+        --color-desktop: var(--chart-1);
+        --color-mobile: var(--chart-2);
+      }
+
+      .dark [data-chart="chart-r1d"] {
+        --color-desktop: var(--chart-1);
+        --color-mobile: var(--chart-2);
+      }
+    </style>
+    <div
+      class="recharts-responsive-container"
+      style="width: 100%; height: 100%; min-width: 0px"
+    >
+      <div
+        style="width: 0px; height: 0px; overflow: visible"
+      >
+        <div
+          width="564"
+          height="250"
+          class="recharts-wrapper"
+          style="
+            position: relative;
+            cursor: default;
+            width: 564px;
+            height: 250px;
+          "
+        >
+          <div
+            xmlns="http://www.w3.org/1999/xhtml"
+            tabindex="-1"
+            class="recharts-tooltip-wrapper"
+            style="
+              visibility: hidden;
+              pointer-events: none;
+              position: absolute;
+              top: 0px;
+              left: 0px;
+            "
+          ></div>
+          <div
+            class="recharts-legend-wrapper"
+            style="
+              position: absolute;
+              width: 540px;
+              height: auto;
+              left: 12px;
+              bottom: 0px;
+            "
+          >
+            <div
+              class="flex items-center justify-center gap-4 pt-3"
+            >
+              <div
+                class="[&amp;&gt;svg]:text-muted-foreground flex items-center gap-1.5 [&amp;&gt;svg]:h-3 [&amp;&gt;svg]:w-3"
+              >
+                <div
+                  class="h-2 w-2 shrink-0 rounded-[2px]"
+                  style="
+                    background-color: var(--color-desktop);
+                  "
+                ></div>
+                Desktop
+              </div>
+              <div
+                class="[&amp;&gt;svg]:text-muted-foreground flex items-center gap-1.5 [&amp;&gt;svg]:h-3 [&amp;&gt;svg]:w-3"
+              >
+                <div
+                  class="h-2 w-2 shrink-0 rounded-[2px]"
+                  style="
+                    background-color: var(--color-mobile);
+                  "
+                ></div>
+                Mobile
+              </div>
+            </div>
+          </div>
+          <svg
+            role="application"
+            tabindex="0"
+            class="recharts-surface"
+            width="564"
+            height="250"
+            viewBox="0 0 564 250"
+            style="
+              width: 100%;
+              height: 100%;
+              display: block;
+            "
+          >
+            <title></title>
+            <desc></desc>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_-100"
+            >
+              <g class="recharts-cartesian-grid">
+                <g
+                  class="recharts-cartesian-grid-horizontal"
+                >
+                  <line
+                    stroke="#ccc"
+                    fill="none"
+                    x="60"
+                    y="12"
+                    width="492"
+                    height="180.01249885559082"
+                    x1="60"
+                    y1="192.01249885559082"
+                    x2="552"
+                    y2="192.01249885559082"
+                  ></line>
+                  <line
+                    stroke="#ccc"
+                    fill="none"
+                    x="60"
+                    y="12"
+                    width="492"
+                    height="180.01249885559082"
+                    x1="60"
+                    y1="147.00937414169312"
+                    x2="552"
+                    y2="147.00937414169312"
+                  ></line>
+                  <line
+                    stroke="#ccc"
+                    fill="none"
+                    x="60"
+                    y="12"
+                    width="492"
+                    height="180.01249885559082"
+                    x1="60"
+                    y1="102.00624942779541"
+                    x2="552"
+                    y2="102.00624942779541"
+                  ></line>
+                  <line
+                    stroke="#ccc"
+                    fill="none"
+                    x="60"
+                    y="12"
+                    width="492"
+                    height="180.01249885559082"
+                    x1="60"
+                    y1="57.003124713897705"
+                    x2="552"
+                    y2="57.003124713897705"
+                  ></line>
+                  <line
+                    stroke="#ccc"
+                    fill="none"
+                    x="60"
+                    y="12"
+                    width="492"
+                    height="180.01249885559082"
+                    x1="60"
+                    y1="12"
+                    x2="552"
+                    y2="12"
+                  ></line>
+                </g>
+              </g>
+            </g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_-50"
+            ></g>
+            <defs>
+              <clipPath id="recharts127-clip">
+                <rect
+                  x="60"
+                  y="12"
+                  height="180.01249885559082"
+                  width="492"
+                ></rect>
+              </clipPath>
+            </defs>
+            <defs>
+              <linearGradient
+                id="fillDesktop"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stop-color="var(--color-desktop)"
+                  stop-opacity="0.8"
+                ></stop>
+                <stop
+                  offset="95%"
+                  stop-color="var(--color-desktop)"
+                  stop-opacity="0.1"
+                ></stop>
+              </linearGradient>
+              <linearGradient
+                id="fillMobile"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stop-color="var(--color-mobile)"
+                  stop-opacity="0.8"
+                ></stop>
+                <stop
+                  offset="95%"
+                  stop-color="var(--color-mobile)"
+                  stop-opacity="0.1"
+                ></stop>
+              </linearGradient>
+            </defs>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_100"
+            >
+              <g class="recharts-layer recharts-area">
+                <g class="recharts-layer">
+                  <defs>
+                    <clipPath
+                      id="animationClipPath-recharts-area-:r1m:"
+                    >
+                      <rect
+                        x="60"
+                        y="0"
+                        width="0.9702214504809538"
+                        height="193"
+                      ></rect>
+                    </clipPath>
+                  </defs>
+                  <g
+                    class="recharts-layer"
+                    clip-path="url(#animationClipPath-recharts-area-:r1m:)"
+                  >
+                    <g class="recharts-layer">
+                      <path
+                        stroke-width="1"
+                        fill="url(#fillMobile)"
+                        fill-opacity="0.6"
+                        height="180.01249885559082"
+                        stroke="none"
+                        width="492"
+                        id="recharts-area-:r1m:"
+                        class="recharts-curve recharts-area-area"
+                        d="M60,192.012C76.4,192.012,92.8,192.012,109.2,192.012C125.6,192.012,142,192.012,158.4,192.012C174.8,192.012,191.2,192.012,207.6,192.012C224,192.012,240.4,192.012,256.8,192.012C273.2,192.012,289.6,192.012,306,192.012C322.4,192.012,338.8,191.855,355.2,191.539C371.6,191.223,388,190.233,404.4,190.016C420.8,189.799,437.2,189.908,453.6,189.69C470,189.473,486.4,187.431,502.8,187.431C519.2,187.431,535.6,188.648,552,189.865L552,192.012C535.6,192.012,519.2,192.012,502.8,192.012C486.4,192.012,470,192.012,453.6,192.012C437.2,192.012,420.8,192.012,404.4,192.012C388,192.012,371.6,192.012,355.2,192.012C338.8,192.012,322.4,192.012,306,192.012C289.6,192.012,273.2,192.012,256.8,192.012C240.4,192.012,224,192.012,207.6,192.012C191.2,192.012,174.8,192.012,158.4,192.012C142,192.012,125.6,192.012,109.2,192.012C92.8,192.012,76.4,192.012,60,192.012Z"
+                      ></path>
+                      <path
+                        stroke-width="1"
+                        fill="none"
+                        fill-opacity="0.6"
+                        height="180.01249885559082"
+                        stroke="var(--color-mobile)"
+                        width="492"
+                        class="recharts-curve recharts-area-curve"
+                        d="M60,192.012C76.4,192.012,92.8,192.012,109.2,192.012C125.6,192.012,142,192.012,158.4,192.012C174.8,192.012,191.2,192.012,207.6,192.012C224,192.012,240.4,192.012,256.8,192.012C273.2,192.012,289.6,192.012,306,192.012C322.4,192.012,338.8,191.855,355.2,191.539C371.6,191.223,388,190.233,404.4,190.016C420.8,189.799,437.2,189.908,453.6,189.69C470,189.473,486.4,187.431,502.8,187.431C519.2,187.431,535.6,188.648,552,189.865"
+                      ></path>
+                    </g>
+                  </g>
+                </g>
+              </g>
+              <g class="recharts-layer recharts-area">
+                <g class="recharts-layer">
+                  <defs>
+                    <clipPath
+                      id="animationClipPath-recharts-area-:r1n:"
+                    >
+                      <rect
+                        x="60"
+                        y="0"
+                        width="0.9702214504809538"
+                        height="193"
+                      ></rect>
+                    </clipPath>
+                  </defs>
+                  <g
+                    class="recharts-layer"
+                    clip-path="url(#animationClipPath-recharts-area-:r1n:)"
+                  >
+                    <g class="recharts-layer">
+                      <path
+                        stroke-width="1"
+                        fill="url(#fillDesktop)"
+                        fill-opacity="0.6"
+                        height="180.01249885559082"
+                        stroke="none"
+                        width="492"
+                        id="recharts-area-:r1n:"
+                        class="recharts-curve recharts-area-area"
+                        d="M60,190.747C76.4,189.913,92.8,189.078,109.2,189.078C125.6,189.078,142,190.006,158.4,190.373C174.8,190.739,191.2,191.276,207.6,191.276C224,191.276,240.4,187.077,256.8,187.077C273.2,187.077,289.6,189.591,306,189.591C322.4,189.591,338.8,186.891,355.2,181.489C371.6,176.087,388,107.975,404.4,94.647C420.8,81.319,437.2,87.231,453.6,74.655C470,62.079,486.4,19.191,502.8,19.191C519.2,19.191,535.6,28.137,552,37.083L552,189.865C535.6,188.648,519.2,187.431,502.8,187.431C486.4,187.431,470,189.473,453.6,189.69C437.2,189.908,420.8,189.799,404.4,190.016C388,190.233,371.6,191.223,355.2,191.539C338.8,191.855,322.4,192.012,306,192.012C289.6,192.012,273.2,192.012,256.8,192.012C240.4,192.012,224,192.012,207.6,192.012C191.2,192.012,174.8,192.012,158.4,192.012C142,192.012,125.6,192.012,109.2,192.012C92.8,192.012,76.4,192.012,60,192.012Z"
+                      ></path>
+                      <path
+                        stroke-width="1"
+                        fill="none"
+                        fill-opacity="0.6"
+                        height="180.01249885559082"
+                        stroke="var(--color-desktop)"
+                        width="492"
+                        class="recharts-curve recharts-area-curve"
+                        d="M60,190.747C76.4,189.913,92.8,189.078,109.2,189.078C125.6,189.078,142,190.006,158.4,190.373C174.8,190.739,191.2,191.276,207.6,191.276C224,191.276,240.4,187.077,256.8,187.077C273.2,187.077,289.6,189.591,306,189.591C322.4,189.591,338.8,186.891,355.2,181.489C371.6,176.087,388,107.975,404.4,94.647C420.8,81.319,437.2,87.231,453.6,74.655C470,62.079,486.4,19.191,502.8,19.191C519.2,19.191,535.6,28.137,552,37.083"
+                      ></path>
+                    </g>
+                  </g>
+                </g>
+              </g>
+            </g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_200"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_300"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_400"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_500"
+            >
+              <g
+                class="recharts-layer recharts-cartesian-axis recharts-xAxis xAxis"
+              >
+                <g
+                  class="recharts-cartesian-axis-ticks recharts-xAxis-ticks"
+                >
+                  <g
+                    class="recharts-cartesian-axis-tick-lines recharts-xAxis-tick-lines"
+                  >
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                  </g>
+                </g>
+              </g>
+              <g
+                class="recharts-layer recharts-cartesian-axis recharts-yAxis yAxis"
+              >
+                <g
+                  class="recharts-cartesian-axis-ticks recharts-yAxis-ticks"
+                >
+                  <g
+                    class="recharts-cartesian-axis-tick-lines recharts-yAxis-tick-lines"
+                  >
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                    <g
+                      class="recharts-layer recharts-cartesian-axis-tick"
+                    ></g>
+                  </g>
+                </g>
+              </g>
+            </g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_600"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_1000"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_1100"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_1200"
+            ></g>
+            <g
+              tabindex="-1"
+              class="recharts-zIndex-layer_2000"
+            >
+              <g
+                class="recharts-cartesian-axis-tick-labels recharts-xAxis-tick-labels"
+              >
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="60"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan x="60" dy="0.71em">Apr 12</tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="158.4"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan x="158.4" dy="0.71em">
+                      Apr 26
+                    </tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="256.8"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan x="256.8" dy="0.71em">
+                      May 10
+                    </tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="355.20000000000005"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan
+                      x="355.20000000000005"
+                      dy="0.71em"
+                    >
+                      May 24
+                    </tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="453.6"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan x="453.6" dy="0.71em">
+                      Jun 7
+                    </tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    height="30"
+                    orientation="bottom"
+                    width="492"
+                    stroke="none"
+                    x="547.46875"
+                    y="206.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="middle"
+                    fill="#666"
+                  >
+                    <tspan x="547.46875" dy="0.71em">
+                      Jun 21
+                    </tspan>
+                  </text>
+                </g>
+              </g>
+              <g
+                class="recharts-cartesian-axis-tick-labels recharts-yAxis-tick-labels"
+              >
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    width="48"
+                    orientation="left"
+                    height="180.01249885559082"
+                    stroke="none"
+                    x="46"
+                    y="192.01249885559082"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="end"
+                    fill="#666"
+                  >
+                    <tspan x="46" dy="0.355em"></tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    width="48"
+                    orientation="left"
+                    height="180.01249885559082"
+                    stroke="none"
+                    x="46"
+                    y="147.00937414169312"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="end"
+                    fill="#666"
+                  >
+                    <tspan x="46" dy="0.355em">25k</tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    width="48"
+                    orientation="left"
+                    height="180.01249885559082"
+                    stroke="none"
+                    x="46"
+                    y="102.00624942779541"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="end"
+                    fill="#666"
+                  >
+                    <tspan x="46" dy="0.355em">50k</tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    width="48"
+                    orientation="left"
+                    height="180.01249885559082"
+                    stroke="none"
+                    x="46"
+                    y="57.003124713897705"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="end"
+                    fill="#666"
+                  >
+                    <tspan x="46" dy="0.355em">75k</tspan>
+                  </text>
+                </g>
+                <g
+                  class="recharts-layer recharts-cartesian-axis-tick-label"
+                >
+                  <text
+                    width="48"
+                    orientation="left"
+                    height="180.01249885559082"
+                    stroke="none"
+                    x="46"
+                    y="12"
+                    class="recharts-text recharts-cartesian-axis-tick-value"
+                    text-anchor="end"
+                    fill="#666"
+                  >
+                    <tspan x="46" dy="0.355em">100k</tspan>
+                  </text>
+                </g>
+              </g>
+            </g>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+`;
+
+// testWisprScrapingWithHTML(mockWisprHtml);
+
+export { extractUsers, testWisprScrapingWithHTML };

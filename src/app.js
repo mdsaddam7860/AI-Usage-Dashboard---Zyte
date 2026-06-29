@@ -3,6 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { fetchClaudeData, fetchCopilotData } from "./services/ai.service.js";
 import { scrapeWisprData } from "./integrations/wispr/wisprScraper.js";
+import { fetchWisprData } from "./integrations/wispr/wispr.js";
 
 // 1. Recreate __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -32,9 +33,11 @@ app.get("/api/dashboard-data", async (req, res) => {
 
     // Fetch data concurrently using resolved credentials
     const [claudeData, copilotData, wisprData] = await Promise.all([
-      fetchClaudeData(aKey),
-      fetchCopilotData(gToken, gOrg),
-      scrapeWisprData(process.env.WISPR_EMAIL, process.env.WISPR_PASSWORD),
+      fetchClaudeData(aKey, false),
+      fetchCopilotData(gToken, gOrg, false),
+      fetchWisprData(process.env.AUTH_TOKEN),
+      // scrapeWisprData(process.env.WISPR_EMAIL, process.env.WISPR_PASSWORD),
+      // scrapeWisprData(null, null, false, "google"),
     ]);
 
     // Construct the response payload

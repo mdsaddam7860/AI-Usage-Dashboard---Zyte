@@ -56812,7 +56812,6 @@ const mockPayload = {
     ],
   },
 };
-
 // ─────────────────────────────────────────────────────
 // 1. GLOBAL DATA VARIABLES (Start Empty)
 // ─────────────────────────────────────────────────────
@@ -56824,7 +56823,6 @@ const wisprflow = {
   words_dictated_all_time: 249490,
   words_delta_pct: 46.71,
   words_delta_window: "prior 7 days",
-
   top_apps: [
     {
       app: "Slack",
@@ -59724,7 +59722,6 @@ function renderClModelChart(rows) {
     },
   });
 }
-
 function sortWisprUsersByRole(users) {
   if (!users || !Array.isArray(users)) return users;
   const roleOrder = { Admin: 0, Member: 1, Viewer: 2, Billing: 3 };
@@ -59874,9 +59871,60 @@ function renderWisprUsers(wisprUsers) {
     `;
   }
 }
+function loadCachedDashboard() {
+  const cached = localStorage.getItem("dashboardCache");
+
+  if (cached) {
+    try {
+      const data = JSON.parse(cached);
+      console.log("📦 Loaded cached data from localStorage (No API call)");
+
+      // Restore all your global mapped variables
+      clMembers = data.clMembers || [];
+      cpSeatsData = data.cpSeatsData || [];
+      clModelData = data.clModelData || { labels: [], values: [] };
+      clTeamSpend = data.clTeamSpend || [];
+      topTotal = data.topTotal || [];
+      topToday = data.topToday || [];
+
+      // Re-render everything using the cached data
+      if (clMembers.length) {
+        updateClaudeDashboard(clMembers);
+        updateTokenWarnings(clMembers);
+      }
+      if (cpSeatsData.length) {
+        updateCopilotHeroBar(cpSeatsData);
+        updateSavingsBanner(cpSeatsData);
+        // You'll need to pass the cached payload.org_ai_credits too if you saved it
+        updateCopilotTokenWarnings(cpSeatsData, data.orgAiCredits || {});
+      }
+
+      renderClaude();
+      renderCopilot();
+      renderClModelChart(data.rawClaude || []);
+      renderUserSpendChart(cpSeatsData, data.orgAiCredits || {});
+      renderExecutiveCharts(clMembers, cpSeatsData);
+
+      // If you saved Wispr data
+      if (data.wispr) {
+        renderWisprFlow(data.wispr);
+        renderWisprUsers(sortWisprUsersByRole(data.wispr.users));
+      }
+
+      return true; // Cache was found
+    } catch (e) {
+      console.warn("Cache corrupted, clearing it.", e);
+      localStorage.removeItem("dashboardCache");
+    }
+  }
+  return false; // No cache found
+}
 async function fetchRealTimeDashboardData() {
   const refreshBtn = document.getElementById("refresh-icon");
   try {
+    // 1. Change to Loading
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = "Loading...";
     // console.log("Loading Data...");
     // const response = await fetch("/api/dashboard-data");
     // if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -60011,7 +60059,10 @@ async function fetchRealTimeDashboardData() {
     console.error("❌ Error loading dashboard:", err);
     if (typeof showErrorState === "function") showErrorState("dashboard");
   } finally {
-    if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
+    // if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
+    refreshBtn.disabled = false;
+    refreshBtn.innerHTML =
+      '<i class="your-original-icon-class"></i> Refresh Data';
   }
 }
 // ─────────────────────────────────────────────────────
@@ -60268,6 +60319,28 @@ function showErrorState(type) {
 // ─────────────────────────────────────────────────────
 // 4. STARTUP
 // ─────────────────────────────────────────────────────
+// document.addEventListener("DOMContentLoaded", () => {
+//   // 1. Try to load cached data instantly (NO API call)
+//   const hasCache = loadCachedDashboard();
+
+//   // 2. (Optional but recommended) If no cache exists, fetch once automatically.
+//   //    If you want the user to click the button even on first visit, remove this 'if' block.
+//   if (!hasCache) {
+//     console.log("No cache found, fetching data for the first time...");
+//     fetchRealTimeDashboardData();
+//   } else {
+//     console.log("Cache loaded. Click the Refresh button to get new data.");
+//   }
+// });
+
 document.addEventListener("DOMContentLoaded", () => {
-  fetchRealTimeDashboardData();
+  // Load cache on page load
+  const hasCache = loadCachedDashboard();
+  if (!hasCache) fetchRealTimeDashboardData();
+
+  // Bind the refresh button purely in JS
+  document
+    .getElementById("refresh-btn")
+    .addEventListener("click", fetchRealTimeDashboardData);
 });
+

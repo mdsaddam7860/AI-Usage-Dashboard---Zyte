@@ -752,12 +752,8 @@
     <header>
       <div class="logo">AI Usage Dashboard <span>· Zyte</span></div>
       <div class="header-right">
-        <button
-          class="btn-refresh"
-          onclick="fetchRealTimeDashboardData()"
-          id="refresh-btn"
-        >
-          <span id="refresh-icon">🔄</span> Refresh Data
+        <button class="btn-refresh" id="refresh-btn">
+          <span id="refresh-icon"></span>
         </button>
         <span id="last-updated"></span>
         <span class="pill live" id="data-pill">● Live Data</span>
@@ -1082,34 +1078,108 @@
         </div>
       </div>
 
-      <!-- Wispr Flow Section -->
-      <div id=" wispr-section" class="mt-6">
+      <div id="wispr-section" class="mt-6">
         <h3
           class="ml-2 mr-2 text-lg font-semibold text-[#009A2F] mb-1"
           id="execWisprTitle"
         >
           Wispr Flow · voice dictation
         </h3>
-        <div class="ml-2 mr-2text-sm text-gray-500 mb-4" id="execWisprLine">
+        <div class="ml-2 mr-2 text-sm text-gray-500 mb-4" id="execWisprLine">
           —
         </div>
+
         <div
-          class="ml-2 mr-2 mb-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+          class="ml-2 mr-2 mb-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
           id="execWispr"
         ></div>
-        <!-- <div
-          class="hidden mt-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
-          id="execWisprAppsCard"
+
+        <!-- Words Dictated Chart Card -->
+        <div
+          class="ml-2 mr-2 mt-4 bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow"
+          id="wisprWordsChartCard"
         >
-          <h2 class="text-sm font-semibold mb-4 text-gray-900">
-            Top apps by dictation
-          </h2>
-          <div class="relative w-full h-[300px]">
-            <canvas id="execWisprApps"></canvas>
+          <div class="flex items-center justify-between mb-4">
+            <h2
+              class="text-sm font-semibold text-gray-900 flex items-center gap-2"
+            >
+              <span class="w-1.5 h-5 bg-[#009A2F] rounded-full"></span>
+              Words dictated over time
+            </h2>
+
+            <!-- Premium Custom Dropdown Selector -->
+            <div class="relative inline-block text-left select-none">
+              <button
+                id="wisprCustomDropdownBtn"
+                type="button"
+                class="inline-flex w-[140px] items-center justify-between gap-x-1.5 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm border border-gray-200 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
+              >
+                <span id="wisprSelectedValue">Weekly view</span>
+                <svg
+                  class="h-4 w-4 text-gray-400 transition-transform duration-200"
+                  id="wisprChevronIcon"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+
+              <!-- Dropdown Menu Options Overlays -->
+              <div
+                id="wisprCustomMenu"
+                class="absolute right-0 z-50 mt-1 w-[140px] origin-top-right rounded-xl bg-white border border-gray-100 p-1 shadow-lg ring-1 ring-black/5 focus:outline-none transition-all scale-95 opacity-0 pointer-events-none duration-150"
+              >
+                <button
+                  data-value="weekly"
+                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                >
+                  <span>Weekly view</span>
+                  <svg
+                    class="wispr-check h-4 w-4 text-[#009A2F]"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    id="check-weekly"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+                <button
+                  data-value="daily"
+                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 font-medium transition-colors"
+                >
+                  <span>Daily view</span>
+                  <svg
+                    class="wispr-check h-4 w-4 text-[#009A2F] hidden"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    id="check-daily"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
-        </div> -->
-        <!-- Wispr User List -->
-        <div class="mt-6 ml-2 mr-2">
+
+          <div class="relative w-full h-[300px]">
+            <canvas id="wisprWordsChart"></canvas>
+          </div>
+        </div>
+
+        <div class="hidden mt-3 p-5">
           <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-5">
             <h4
               class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2"
@@ -1120,9 +1190,7 @@
             <div
               id="wispr-user-list"
               class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
-            >
-              <!-- Cards will be injected here -->
-            </div>
+            ></div>
           </div>
         </div>
       </div>
@@ -1712,11 +1780,12 @@
               margin: 0;
               display: flex;
               flex-direction: column;
-              max-height: 400px;
+              max-height: 425px;
             "
           >
-            <div class="card-title">High Spending Members</div>
-            <!-- <div class="card-sub">High Spending Members</div> -->
+            <div class="card-title" style="margin: 0">
+              High Spending Members
+            </div>
             <div
               class="scrollable-list"
               style="
@@ -1724,7 +1793,7 @@
                 overflow-y: auto;
                 padding-right: 5px;
                 /* margin-top: 10px; */
-                min-height: 0;
+                /* max-height: 425px; */
               "
             >
               <!-- Critical Users -->

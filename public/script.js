@@ -3057,9 +3057,215 @@ function renderWisprUsers(wisprUsers) {
     `;
   }
 }
+function loadCachedDashboard() {
+  const cached = localStorage.getItem("dashboardCache");
+
+  if (cached) {
+    try {
+      const data = JSON.parse(cached);
+      console.log("📦 Loaded cached data from localStorage (No API call)");
+
+      // Restore all your global mapped variables
+      clMembers = data.clMembers || [];
+      cpSeatsData = data.cpSeatsData || [];
+      clModelData = data.clModelData || { labels: [], values: [] };
+      clTeamSpend = data.clTeamSpend || [];
+      topTotal = data.topTotal || [];
+      topToday = data.topToday || [];
+
+      // Re-render everything using the cached data
+      if (clMembers.length) {
+        updateClaudeDashboard(clMembers);
+        updateTokenWarnings(clMembers);
+      }
+      if (cpSeatsData.length) {
+        updateCopilotHeroBar(cpSeatsData);
+        updateSavingsBanner(cpSeatsData);
+        // You'll need to pass the cached payload.org_ai_credits too if you saved it
+        updateCopilotTokenWarnings(cpSeatsData, data.orgAiCredits || {});
+      }
+
+      renderClaude();
+      renderCopilot();
+      renderClModelChart(data.rawClaude || []);
+      renderUserSpendChart(cpSeatsData, data.orgAiCredits || {});
+      renderExecutiveCharts(clMembers, cpSeatsData);
+
+      // If you saved Wispr data
+      if (data.wispr) {
+        renderWisprFlow(data.wispr);
+        renderWisprUsers(sortWisprUsersByRole(data.wispr.users));
+      }
+
+      return true; // Cache was found
+    } catch (e) {
+      console.warn("Cache corrupted, clearing it.", e);
+      localStorage.removeItem("dashboardCache");
+    }
+  }
+  return false; // No cache found
+}
+// The function now accepts the data object dynamically
+function initWisprChart(wisprData) {
+  if (!wisprData || !wisprData.daily || !wisprData.weekly) {
+    console.error("Cannot initialize chart: Invalid or missing wisprData.");
+    return;
+  }
+
+  const canvas = document.getElementById("wisprWordsChart");
+  if (!canvas) return;
+
+  // --- CHART LOGIC ---
+  const processChartData = (viewType) => {
+    const dataSet = wisprData[viewType];
+    return {
+      labels: dataSet.map((d) =>
+        new Date(d.period).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        })
+      ),
+      desktop: dataSet.map((d) => d.desktop),
+      mobile: dataSet.map((d) => d.mobile),
+    };
+  };
+
+  const initialData = processChartData("weekly");
+  const ctx = canvas.getContext("2d");
+
+  if (window.wisprChartInstance) {
+    window.wisprChartInstance.destroy();
+  }
+
+  window.wisprChartInstance = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: initialData.labels,
+      datasets: [
+        {
+          label: "Desktop",
+          data: initialData.desktop,
+          borderColor: "#115e59",
+          backgroundColor: "rgba(17, 94, 89, 0.04)", // Elegant super-light gradient area tint
+          borderWidth: 2,
+          fill: true,
+          tension: 0.38,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+        },
+        {
+          label: "Mobile",
+          data: initialData.mobile,
+          borderColor: "#ea580c",
+          backgroundColor: "rgba(234, 88, 12, 0.04)",
+          borderWidth: 2,
+          fill: true,
+          tension: 0.38,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: "index", intersect: false },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: { usePointStyle: true, boxWidth: 6, font: { weight: "500" } },
+        },
+        tooltip: {
+          padding: 12,
+          backgroundColor: "#ffffff",
+          titleColor: "#111827",
+          bodyColor: "#4b5563",
+          borderColor: "#f3f4f6",
+          borderWidth: 1,
+          shadowColor: "rgba(0,0,0,0.1)",
+          boxPadding: 6,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: "#9ca3af", font: { size: 11 } },
+        },
+        y: {
+          grid: { color: "#f9fafb" },
+          border: { display: false },
+          ticks: {
+            color: "#9ca3af",
+            font: { size: 11 },
+            callback: (value) => (value >= 1000 ? value / 1000 + "k" : value),
+          },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  // --- PREMIUM MENU COMPONENT CUSTOM INTERACTION ---
+  const dropdownBtn = document.getElementById("wisprCustomDropdownBtn");
+  const customMenu = document.getElementById("wisprCustomMenu");
+  const chevronIcon = document.getElementById("wisprChevronIcon");
+  const selectedText = document.getElementById("wisprSelectedValue");
+  const optionButtons = document.querySelectorAll(".wispr-option");
+  const checkIcons = document.querySelectorAll(".wispr-check");
+
+  function openDropdown() {
+    customMenu.classList.remove("scale-95", "opacity-0", "pointer-events-none");
+    customMenu.classList.add("scale-100", "opacity-100");
+    chevronIcon.classList.add("rotate-180");
+  }
+
+  function closeDropdown() {
+    customMenu.classList.add("scale-95", "opacity-0", "pointer-events-none");
+    customMenu.classList.remove("scale-100", "opacity-100");
+    chevronIcon.classList.remove("rotate-180");
+  }
+
+  // Toggle dropdown state on main menu click
+  dropdownBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isOpened = customMenu.classList.contains("scale-100");
+    isOpened ? closeDropdown() : openDropdown();
+  });
+
+  // Handle menu list item clicks
+  optionButtons.forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const value = btn.getAttribute("data-value");
+
+      // Update custom layout texts
+      selectedText.textContent =
+        value === "weekly" ? "Weekly view" : "Daily view";
+
+      // Visibility transformations for the custom checkmarks
+      checkIcons.forEach((icon) => icon.classList.add("hidden"));
+      document.getElementById(`check-${value}`).classList.remove("hidden");
+
+      // Refresh Chart.js with the selected granularity context
+      const newData = processChartData(value);
+      window.wisprChartInstance.data.labels = newData.labels;
+      window.wisprChartInstance.data.datasets[0].data = newData.desktop;
+      window.wisprChartInstance.data.datasets[1].data = newData.mobile;
+      window.wisprChartInstance.update();
+
+      closeDropdown();
+    });
+  });
+
+  // Dismiss dropdown menu cleanly if clicking anywhere else outside of the toggle container
+  document.addEventListener("click", closeDropdown);
+}
 async function fetchRealTimeDashboardData() {
   const refreshBtn = document.getElementById("refresh-icon");
   try {
+    // 1. Change to Loading
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = "Loading...";
     console.log("Loading Data...");
     const response = await fetch("/api/dashboard-data");
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -3159,6 +3365,7 @@ async function fetchRealTimeDashboardData() {
       renderWisprFlow(payload.wispr);
       const sortedUsers = sortWisprUsersByRole(payload?.wispr.users);
       renderWisprUsers(sortedUsers);
+      initWisprChart(payload.wispr);
       // renderWisprFlow(wisprflow); // !!! Temporary - for testing
     }
     if (typeof clMembers !== "undefined") {
@@ -3192,7 +3399,10 @@ async function fetchRealTimeDashboardData() {
     console.error("❌ Error loading dashboard:", err);
     if (typeof showErrorState === "function") showErrorState("dashboard");
   } finally {
-    if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
+    // if (refreshBtn) refreshBtn.textContent = "🔄"; // Change back to arrows
+    refreshBtn.disabled = false;
+    refreshBtn.innerHTML =
+      '<i class="your-original-icon-class"></i> Refresh Data';
   }
 }
 // ─────────────────────────────────────────────────────
@@ -3449,6 +3659,27 @@ function showErrorState(type) {
 // ─────────────────────────────────────────────────────
 // 4. STARTUP
 // ─────────────────────────────────────────────────────
+// document.addEventListener("DOMContentLoaded", () => {
+//   // 1. Try to load cached data instantly (NO API call)
+//   const hasCache = loadCachedDashboard();
+
+//   // 2. (Optional but recommended) If no cache exists, fetch once automatically.
+//   //    If you want the user to click the button even on first visit, remove this 'if' block.
+//   if (!hasCache) {
+//     console.log("No cache found, fetching data for the first time...");
+//     fetchRealTimeDashboardData();
+//   } else {
+//     console.log("Cache loaded. Click the Refresh button to get new data.");
+//   }
+// });
+
 document.addEventListener("DOMContentLoaded", () => {
-  fetchRealTimeDashboardData();
+  // Load cache on page load
+  const hasCache = loadCachedDashboard();
+  if (!hasCache) fetchRealTimeDashboardData();
+
+  // Bind the refresh button purely in JS
+  document
+    .getElementById("refresh-btn")
+    .addEventListener("click", fetchRealTimeDashboardData);
 });

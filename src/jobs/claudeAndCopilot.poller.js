@@ -32,7 +32,8 @@ cron.schedule(scheduleFrequency, async () => {
     const results = await Promise.allSettled([
       fetchClaudeData(aKey, isRefreshData),
       fetchCopilotData(gToken, gOrg, isRefreshData),
-      scrapeWisprData(process.env.WISPR_EMAIL, process.env.WISPR_PASSWORD),
+      // scrapeWisprData(process.env.WISPR_EMAIL, process.env.WISPR_PASSWORD),
+      scrapeWisprData(null, null, true, "google"),
     ]);
 
     // Log individual failures

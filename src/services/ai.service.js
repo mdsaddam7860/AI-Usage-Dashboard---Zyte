@@ -682,13 +682,13 @@ async function fetchCopilotData(token, org) {
 }
 */
 
-async function fetchCopilotData(token, org) {
+async function fetchCopilotData(token, org, isRefreshData = false) {
   if (!token || !org)
     return { copilot: [], copilot_seats: [], org_ai_credits: null };
 
   // 1. Try file cache first
   const cached = readCache(COPILOT_CACHE_FILE);
-  if (cached) {
+  if (cached && !isRefreshData) {
     logger.debug("Copilot: loaded from file cache");
     return cached;
   }

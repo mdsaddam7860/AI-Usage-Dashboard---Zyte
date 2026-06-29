@@ -2,6 +2,10 @@ import "./bootstrap.js";
 import app from "./src/app.js";
 import { logger } from "./src/index.js";
 import { getHubspotClient } from "./src/configs/hubspot.config.js";
+import { scrapeWisprData2 } from "./src/integrations/wispr/test.js";
+import { scrapeWisprData } from "./src/integrations/wispr/wisprScraper.js";
+import { testWisprScrapingWithHTML } from "./src/controllers/test.js";
+import { fetchWisprData } from "./src/integrations/wispr/wispr.js";
 // import "./src/jobs/claudeAndCopilot.poller.js";
 
 // Start the server, For CI/CD deployments remove deploy.yml from .gitignore

@@ -1,0 +1,16 @@
+[
+  {
+    "name": "ph_phc_yV8yhSiAUoblWb3L5ju54QEk6Y3u2rA3xV4Dep1yIDC_posthog",
+    "value": "%7B%22%24device_id%22%3A%22019f0323-f18e-76c4-a8c2-87171b02c1a3%22%2C%22distinct_id%22%3A%221ebdceb8-49a2-42a5-9fae-06b41ce29911%22%2C%22%24sesid%22%3A%5B1782481274121%2C%22019f0429-a376-77af-8f70-98018196f5ef%22%2C1782481265524%5D%2C%22%24epp%22%3Atrue%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Fadmin.wisprflow.ai%2Flogin%22%7D%2C%22%24user_state%22%3A%22identified%22%7D",
+    "domain": ".wisprflow.ai",
+    "path": "/",
+    "expires": 1814017274,
+    "size": 479,
+    "httpOnly": false,
+    "secure": true,
+    "session": false,
+    "sameSite": "Lax",
+    "priority": "Medium",
+    "sourceScheme": "Secure"
+  }
+]
