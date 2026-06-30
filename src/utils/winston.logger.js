@@ -128,7 +128,7 @@ const developementLogger = function () {
     format: fileFormat,
     level: "debug",
     maxsize: 20 * 1024 * 1024, // 20MB
-    maxFiles: "10",
+    maxFiles: "5",
     handleExceptions: true,
     handleRejections: true,
   });

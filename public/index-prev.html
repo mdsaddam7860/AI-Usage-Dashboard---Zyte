@@ -11,24 +11,22 @@
         --bg: #f4f0f5;
         --surface: #fff;
         --surface2: #faf7fa;
-        --border: #e8d9ec;
+        --border: #e5dde8;
         --text: #1a1a2e;
-        --muted: #737373;
-        --cl: #d946ef;
-        --cl-light: #e879f5;
-        --cl-dim: #fbeafc;
-        --cp: #8b95ee;
-        --cp-light: #aab2f3;
-        --cp-dim: #eef0fd;
+        --muted: #8a8a9a;
+        --cl: #7c3aed;
+        --cl-light: #a855f7;
+        --cl-dim: #f3effe;
+        --cp: #1d4ed8;
+        --cp-light: #3b82f6;
+        --cp-dim: #eff6ff;
         --green: #16a34a;
         --green-dim: #dcfce7;
-        --amber: #e8520a;
-        --amber-dim: #fde9de;
+        --amber: #d97706;
+        --amber-dim: #fef3c7;
         --red: #dc2626;
         --red-dim: #fee2e2;
-        --purple-bar: #b02cce;
-        --blue: #8b95ee;
-        --headline-gradient: linear-gradient(90deg, #e8520a 0%, #c026d3 100%);
+        --purple-bar: #9333ea;
       }
       * {
         box-sizing: border-box;
@@ -111,7 +109,7 @@
       .pill.demo {
         background: var(--amber-dim);
         color: var(--amber);
-        border: 1px solid #f6c2a3;
+        border: 1px solid #fde68a;
       }
       .pill.live {
         background: var(--green-dim);
@@ -424,8 +422,8 @@
       }
       .alert.warn {
         background: var(--amber-dim);
-        border: 1px solid #f6c2a3;
-        color: #93340a;
+        border: 1px solid #fde68a;
+        color: #92400e;
       }
       .alert.ok {
         background: var(--green-dim);
@@ -434,8 +432,8 @@
       }
       .alert.info {
         background: var(--cl-dim);
-        border: 1px solid #f3b8f0;
-        color: #8a1a86;
+        border: 1px solid #ddd6fe;
+        color: #5b21b6;
       }
 
       /* ── insight cards ── */
@@ -495,7 +493,7 @@
         border-radius: 10px;
         border: 1px solid var(--border);
         overflow: hidden;
-        /* margin-bottom: 16px; */
+        margin-bottom: 16px;
       }
       .tcard-head {
         display: flex;
@@ -660,7 +658,7 @@
 
       /* ── savings bar ── */
       .savings-bar {
-        background: var(--headline-gradient);
+        background: linear-gradient(135deg, #1d4ed8, #7c3aed);
         border-radius: 10px;
         padding: 16px 20px;
         color: #fff;
@@ -779,7 +777,7 @@
     <div id="page-exec" class="page active" style="display: block">
       <div class="w-full">
         <h3
-          class="text-xs font-bold uppercase tracking-wider text-[#D946EF] mt-6 mb-3 ml-2"
+          class="text-xs font-bold uppercase tracking-wider text-purple-700 mt-6 mb-3 ml-2"
         >
           Claude Enterprise · month to date
         </h3>
@@ -797,7 +795,7 @@
                 Total MTD Spend
               </div>
               <div
-                class="text-2xl font-bold tracking-tight text-[#D946EF]"
+                class="text-2xl font-bold tracking-tight text-purple-700"
                 id="stat-total-spend"
               >
                 —
@@ -904,7 +902,7 @@
 
       <div class="w-full">
         <h3
-          class="text-xs font-bold uppercase tracking-wider text-[#8B95EE] mt-8 mb-3 ml-2"
+          class="text-xs font-bold uppercase tracking-wider text-indigo-900 mt-8 mb-3 ml-2"
         >
           GitHub Copilot · last 28 days
         </h3>
@@ -1001,7 +999,7 @@
               Reclaimable / Mo
             </div>
             <div
-              class="text-2xl font-bold mt-1 tracking-tight text-[#E8520A]"
+              class="text-2xl font-bold mt-1 tracking-tight text-amber-600"
               id="cp-reclaimable-val"
             >
               —
@@ -1082,7 +1080,7 @@
 
       <div id="wispr-section" class="mt-6">
         <h3
-          class="ml-2 mr-2 text-lg font-semibold text-[#D946EF] mb-1"
+          class="ml-2 mr-2 text-lg font-semibold text-[#009A2F] mb-1"
           id="execWisprTitle"
         >
           Wispr Flow · voice dictation
@@ -1105,7 +1103,7 @@
             <h2
               class="text-sm font-semibold text-gray-900 flex items-center gap-2"
             >
-              <span class="w-1.5 h-5 bg-[#D946EF] rounded-full"></span>
+              <span class="w-1.5 h-5 bg-[#009A2F] rounded-full"></span>
               Words dictated over time
             </h2>
 
@@ -1114,7 +1112,7 @@
               <button
                 id="wisprCustomDropdownBtn"
                 type="button"
-                class="inline-flex w-[140px] items-center justify-between gap-x-1.5 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm border border-gray-200 hover:bg-[#fdf2f8] transition-all active:scale-[0.98] focus:outline-none focus:border-[#D946EF] focus:ring-2 focus:ring-[#D946EF]/20"
+                class="inline-flex w-[140px] items-center justify-between gap-x-1.5 rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm border border-gray-200 hover:bg-gray-50 transition-all active:scale-[0.98] focus:outline-none"
               >
                 <span id="wisprSelectedValue">Weekly view</span>
                 <svg
@@ -1138,11 +1136,11 @@
               >
                 <button
                   data-value="weekly"
-                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-[#fdf2f8] font-medium transition-colors"
+                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 font-medium transition-colors"
                 >
                   <span>Weekly view</span>
                   <svg
-                    class="wispr-check h-4 w-4 text-[#D946EF]"
+                    class="wispr-check h-4 w-4 text-[#009A2F]"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     id="check-weekly"
@@ -1156,11 +1154,11 @@
                 </button>
                 <button
                   data-value="daily"
-                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-[#fdf2f8] font-medium transition-colors"
+                  class="wispr-option flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm text-gray-600 hover:bg-gray-50 font-medium transition-colors"
                 >
                   <span>Daily view</span>
                   <svg
-                    class="wispr-check h-4 w-4 text-[#D946EF] hidden"
+                    class="wispr-check h-4 w-4 text-[#009A2F] hidden"
                     viewBox="0 0 20 20"
                     fill="currentColor"
                     id="check-daily"
@@ -1186,7 +1184,7 @@
             <h4
               class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2"
             >
-              <span class="w-1.5 h-5 bg-[#D946EF] rounded-full"></span>
+              <span class="w-1.5 h-5 bg-[#009A2F] rounded-full"></span>
               Wispr Users
             </h4>
             <div
@@ -1214,7 +1212,7 @@
                 Total MTD Spend
               </div>
               <div
-                class="text-2xl font-bold tracking-tight text-[#D946EF]"
+                class="text-2xl font-bold tracking-tight text-purple-700"
                 id="cl-stat-total-spend"
               >
                 —
@@ -1582,65 +1580,21 @@
               oninput="filterClMembers(this.value)"
             />
           </div>
-
-          <!-- Scrollable table wrapper -->
-          <div class="max-h-[500px] overflow-y-auto overflow-x-auto relative">
-            <table
-              class="w-full min-w-[700px] border-separate border-spacing-0"
-            >
-              <thead class="sticky top-0 z-10">
-                <tr>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('name')"
-                  >
-                    Name ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap"
-                  >
-                    Email
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('team')"
-                  >
-                    Team ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('spend')"
-                  >
-                    MTD Spend ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('requests')"
-                  >
-                    Requests ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('cpr')"
-                  >
-                    Cost/Req ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap"
-                  >
-                    Cap
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCl('util')"
-                  >
-                    Util % ↕
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="cl-tbody"></tbody>
-            </table>
-          </div>
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortCl('name')">Name ↕</th>
+                <th>Email</th>
+                <th onclick="sortCl('team')">Team ↕</th>
+                <th onclick="sortCl('spend')">MTD Spend ↕</th>
+                <th onclick="sortCl('requests')">Requests ↕</th>
+                <th onclick="sortCl('cpr')">Cost/Req ↕</th>
+                <th>Cap</th>
+                <th onclick="sortCl('util')">Util % ↕</th>
+              </tr>
+            </thead>
+            <tbody id="cl-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -2015,66 +1969,48 @@
               oninput="filterCpSearch(this.value)"
             />
           </div>
-
-          <!-- Scrollable table wrapper with max height and overflow -->
-          <div class="max-h-[500px] overflow-y-auto overflow-x-auto relative">
-            <table
-              class="w-full min-w-[700px] border-separate border-spacing-0"
-            >
-              <thead class="sticky top-0 z-10">
-                <tr>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCp('displayName')"
-                  >
-                    Name ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap"
-                  >
-                    GitHub
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap"
-                  >
-                    Team
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap"
-                  >
-                    Activity
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCp('cleanTimestamp')"
-                  >
-                    Last Activity ↕
-                  </th>
-                  <th
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCp('cleanEditor')"
-                  >
-                    Editor ↕
-                  </th>
-                  <th
-                    id="th-net-credit"
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCp('netCredits')"
-                  >
-                    AI CREDIT ↕
-                  </th>
-                  <th
-                    id="th-net-amount"
-                    class="bg-white border-b-2 border-[#e5dde8] text-left px-4 py-2 text-xs font-bold uppercase tracking-wider text-[#8a8a9a] whitespace-nowrap cursor-pointer hover:text-[#1a1a2e] select-none"
-                    onclick="sortCp('netAmount')"
-                  >
-                    AMOUNT ↕
-                  </th>
-                </tr>
-              </thead>
-              <tbody id="cp-tbody"></tbody>
-            </table>
-          </div>
+          <table>
+            <thead>
+              <tr>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('displayName')"
+                >
+                  Name ↕
+                </th>
+                <th>GitHub</th>
+                <th>Team</th>
+                <th>Activity</th>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('cleanTimestamp')"
+                >
+                  Last Activity ↕
+                </th>
+                <th
+                  style="cursor: pointer; user-select: none"
+                  onclick="sortCp('cleanEditor')"
+                >
+                  Editor ↕
+                </th>
+                <th
+                  id="th-net-credit"
+                  style="cursor: pointer"
+                  onclick="sortCp('netCredits')"
+                >
+                  AI CREDIT ↕
+                </th>
+                <th
+                  id="th-net-amount"
+                  style="cursor: pointer"
+                  onclick="sortCp('netAmount')"
+                >
+                  AMOUNT ↕
+                </th>
+              </tr>
+            </thead>
+            <tbody id="cp-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>

@@ -15,7 +15,6 @@ let clModelData = { labels: [], data: [] }; // New: For the Model chart
 let cpTeamCost = []; // New: For Copilot Team chart
 let cpEditorData = []; // New: For Editor chart
 let cpDays = []; // New: For lines/acceptances charts
-const colors = { claude: "#B02CCE", copilot: "#8B95EE" };
 
 function exportToCSVCopilot() {
   // 1. Get the current data being shown in the table
@@ -121,18 +120,10 @@ function exportToCSVClaude() {
 
   URL.revokeObjectURL(url);
 }
+// Ensure you have Chart.js included in your <head> for the graphs to work!
+// <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 function populateExecutiveSummary() {
-  // --- Brand colors ---
-  const colors = {
-    claude: "#D946EF", // primary purple
-    copilot: "#8B95EE", // accent blue
-    wispr: "#D946EF", // use primary for Wispr
-    accent: "#E8520A", // accent orange
-    secondary: "#B02CCE", // secondary purple
-    neutral: "#737373", // neutral gray
-  };
-
   // --- Helper formatters ---
   const money = (n) =>
     n == null
@@ -151,14 +142,14 @@ function populateExecutiveSummary() {
   // --- TAILWIND KPI CARD GENERATOR ---
   function kpiCard(label, value, hint) {
     return `
-        <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-          <div>
-            <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">${label}</div>
-            <div class="text-2xl font-bold mt-1 tracking-tight text-gray-900">${value}</div>
-          </div>
-          ${hint ? `<div class="text-xs text-gray-500 mt-2">${hint}</div>` : ""}
+      <div class="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+        <div>
+          <div class="text-gray-500 text-xs font-semibold uppercase tracking-wider">${label}</div>
+          <div class="text-2xl font-bold mt-1 tracking-tight text-gray-900">${value}</div>
         </div>
-      `;
+        ${hint ? `<div class="text-xs text-gray-500 mt-2">${hint}</div>` : ""}
+      </div>
+    `;
   }
 
   // 1. Populate Claude KPI Cards
@@ -195,7 +186,8 @@ function populateExecutiveSummary() {
       kpiCard("Acceptance", s.acceptance_rate + "%", "28 days");
   }
 
-  // 3. Render Combined Charts (Claude vs Copilot) - using new brand colors
+  // 3. Render Combined Charts (Claude vs Copilot)
+  // We keep the original brand colors (#B02CCE and #181E5A) for the charts so they match the logos
   const labels = CL
     ? CL.daily.slice(-30).map((d) => d.date.slice(5))
     : CP && CP.daily
@@ -206,8 +198,8 @@ function populateExecutiveSummary() {
     ds.push({
       label: "Claude",
       data: CL.daily.slice(-30).map((d) => d.cost_usd),
-      borderColor: colors.claude,
-      backgroundColor: "rgba(217, 70, 239, 0.15)",
+      borderColor: "#B02CCE",
+      backgroundColor: "rgba(176,44,206,.15)",
       fill: true,
       tension: 0.3,
     });
@@ -218,7 +210,7 @@ function populateExecutiveSummary() {
     ds.push({
       label: "Copilot (seats · prorated)",
       data: labels.map(() => perDay),
-      borderColor: colors.copilot,
+      borderColor: "#181E5A",
       borderDash: [5, 4],
       pointRadius: 0,
       tension: 0,
@@ -264,9 +256,7 @@ function populateExecutiveSummary() {
       type: "doughnut",
       data: {
         labels: dl,
-        datasets: [
-          { data: dv, backgroundColor: [colors.claude, colors.copilot] },
-        ],
+        datasets: [{ data: dv, backgroundColor: ["#B02CCE", "#181E5A"] }],
       },
       options: {
         responsive: true,
@@ -280,7 +270,7 @@ function populateExecutiveSummary() {
     });
   }
 
-  // 4. Populate Wispr Flow Data - using brand colors
+  // 4. Populate Wispr Flow Data
   const WF = window.wisprFlowData;
   if (WF) {
     const line =
@@ -296,6 +286,7 @@ function populateExecutiveSummary() {
     const trendStr =
       delta != null ? (delta >= 0 ? "+" : "") + delta + "%" : "—";
 
+    // Add a text-green-600 or text-red-600 class directly to the trend HTML if you want it colored
     const trendHtml = `<span class="${
       delta >= 0 ? "text-green-600" : "text-red-600"
     }">${trendStr}</span>`;
@@ -327,16 +318,12 @@ function populateExecutiveSummary() {
               label: "% of dictation",
               data: apps.map((a) => a.pct),
               backgroundColor: [
-                colors.claude, // #D946EF - primary
-                colors.copilot, // #8B95EE - accent blue
-                colors.accent, // #E8520A - orange
-                colors.secondary, // #B02CCE - secondary purple
-                "#f472b6", // pink
-                "#6366f1", // indigo
-                "#fb923c", // light orange
-                "#e879f5", // light purple
-                "#14b8a6", // teal
-                "#737373", // neutral
+                "#B02CCE",
+                "#181E5A",
+                "#009A2F",
+                "#33525F",
+                "#9BADB5",
+                "#E8520A",
               ],
             },
           ],
@@ -360,7 +347,6 @@ function populateExecutiveSummary() {
     document.getElementById("execWisprAppsCard").style.display = "none";
   }
 }
-
 function renderExecutiveCharts(clMembers, cpSeatsData) {
   // console.log(
   //   `Rendering Executive Charts for ${JSON.stringify(
@@ -382,7 +368,7 @@ function renderExecutiveCharts(clMembers, cpSeatsData) {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
-  const colors = { claude: "#B02CCE", copilot: "#8B95EE" };
+  const colors = { claude: "#B02CCE", copilot: "#181E5A" };
 
   // ==========================================
   // CALCULATE SUMMARY METRICS FROM RAW DATA
@@ -844,29 +830,17 @@ const fmt = (n) =>
     maximumFractionDigits: 2,
   });
 const fmtN = (n) => Number(n).toLocaleString();
-// const pal = [
-//   "#d946ef",
-//   "#8b95ee",
-//   "#e8520a",
-//   "#b02cce",
-//   "#c026d3",
-//   "#f472b6",
-//   "#fb923c",
-//   "#6366f1",
-//   "#e879f5",
-//   "#737373",
-// ];
 const pal = [
-  "#d946ef", // primary purple
-  "#8b95ee", // accent blue
-  "#e8520a", // accent orange
-  "#b02cce", // secondary purple
-  "#c026d3", // darker purple
-  "#f472b6", // pink
-  "#fb923c", // light orange
-  "#6366f1", // indigo
-  "#e879f5", // light purple
-  "#737373", // neutral gray
+  "#9333ea",
+  "#7c3aed",
+  "#2563eb",
+  "#0891b2",
+  "#059669",
+  "#d97706",
+  "#dc2626",
+  "#db2777",
+  "#65a30d",
+  "#0284c7",
 ];
 
 function switchTab(targetPageId) {
@@ -1008,7 +982,7 @@ function renderClaude() {
       datasets: [
         {
           data: topToday.map((x) => x.val),
-          backgroundColor: "#e879f5",
+          backgroundColor: "#a855f7",
           borderRadius: 4,
         },
       ],
@@ -1020,7 +994,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -1041,7 +1015,7 @@ function renderClaude() {
       datasets: [
         {
           data: topTotal.map((x) => x.val),
-          backgroundColor: "#d946ef",
+          backgroundColor: "#7c3aed",
           borderRadius: 4,
         },
       ],
@@ -1053,7 +1027,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -1098,7 +1072,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -1119,7 +1093,7 @@ function renderClaude() {
       datasets: [
         {
           data: [76, 16, 5, 3],
-          backgroundColor: ["#b02cce", "#d946ef", "#f0a8f7", "#f8d6f8"],
+          backgroundColor: ["#9333ea", "#7c3aed", "#a78bfa", "#c4b5fd"],
           borderWidth: 0,
           hoverOffset: 6,
         },
@@ -1130,7 +1104,7 @@ function renderClaude() {
       plugins: {
         legend: {
           position: "bottom",
-          labels: { color: "#737373", font: { size: 11 }, padding: 10 },
+          labels: { color: "#8a8a9a", font: { size: 11 }, padding: 10 },
         },
       },
     },
@@ -1256,7 +1230,7 @@ function filterSeats(filter, btn) {
      * <td>${grossCredits.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         })}</td>
-        <td style="color:#d946ef;font-weight:500;">$${grossAmount.toFixed(
+        <td style="color:#8b5cf6;font-weight:500;">$${grossAmount.toFixed(
           2
         )}</td>
      */
@@ -1455,7 +1429,7 @@ function renderCopilot() {
       datasets: [
         {
           data: teams.map((x) => x.v),
-          backgroundColor: "#d946ef",
+          backgroundColor: "#7c3aed",
           borderRadius: 3,
         },
       ],
@@ -1467,7 +1441,7 @@ function renderCopilot() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -1553,7 +1527,7 @@ function renderCopilot() {
       plugins: {
         legend: {
           position: "right",
-          labels: { color: "#737373", font: { size: 10 }, boxWidth: 12 },
+          labels: { color: "#8a8a9a", font: { size: 10 }, boxWidth: 12 },
         },
       },
     },
@@ -1975,7 +1949,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
           {
             data: sortedLangs.map((item) => item[1]),
             backgroundColor: [
-              "#d946ef",
+              "#8b5cf6",
               "#3b82f6",
               "#10b981",
               "#f59e0b",
@@ -1986,7 +1960,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
               "#14b8a6",
               "#f97316",
               "#84cc16",
-              "#e879f5",
+              "#a855f7",
               "#eab308",
               "#f43f5e",
               "#06b6d4",
@@ -2028,7 +2002,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
               "#059669",
               "#d97706",
               "#2563eb",
-              "#d946ef",
+              "#7c3aed",
               "#db2777",
               "#475569",
               "#0ea5e9",
@@ -2083,7 +2057,7 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
           {
             label: "Accepted",
             data: acceptedData,
-            backgroundColor: "#d946ef",
+            backgroundColor: "#8b5cf6",
             borderRadius: 4,
           },
         ],
@@ -2103,8 +2077,8 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
           {
             label: "Accept Rate %",
             data: rateData,
-            borderColor: "#8b95ee",
-            backgroundColor: "rgba(139, 149, 238, 0.1)",
+            borderColor: "#3b82f6",
+            backgroundColor: "rgba(59, 130, 246, 0.1)",
             fill: true,
             tension: 0.4,
           },
@@ -2312,7 +2286,7 @@ function renderUserSpendChart(cpSeatsData, orgAiCredits) {
 
     // 7. Array of colors for the Doughnut slices
     const sliceColors = [
-      "#d946ef", // Purple
+      "#8b5cf6", // Purple
       "#10b981", // Green
       "#f59e0b", // Amber
       "#ef4444", // Red
@@ -2348,9 +2322,7 @@ function renderUserSpendChart(cpSeatsData, orgAiCredits) {
             display: true,
             position: "right",
             labels: {
-              usePointStyle: true, // use point style (circle)
-              pointStyle: "circle", // explicitly set circle
-              boxWidth: 10, // adjust size
+              boxWidth: 12,
               font: { size: 11 },
             },
           },
@@ -2411,7 +2383,7 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
       plugins: {
         legend: {
           position: "right",
-          labels: { color: "#737373", font: { size: 10 }, boxWidth: 12 },
+          labels: { color: "#8a8a9a", font: { size: 10 }, boxWidth: 12 },
         },
       },
     },
@@ -2457,7 +2429,7 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
         {
           label: "Accepted",
           data: acceptedData,
-          backgroundColor: "#b02cce",
+          backgroundColor: "#9333ea",
           borderRadius: 4,
         },
       ],
@@ -2467,11 +2439,11 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
       scales: {
         x: {
           stacked: false,
-          ticks: { color: "#737373", font: { size: 9 }, maxTicksLimit: 7 },
+          ticks: { color: "#8a8a9a", font: { size: 9 }, maxTicksLimit: 7 },
           grid: { display: false },
         },
         y: {
-          ticks: { color: "#737373", font: { size: 10 } },
+          ticks: { color: "#8a8a9a", font: { size: 10 } },
           grid: { color: "#f0eaf4" },
         },
       },
@@ -2495,8 +2467,8 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
         {
           label: "Accept Rate %",
           data: rateData,
-          borderColor: "#8b95ee",
-          backgroundColor: "#8b95ee20",
+          borderColor: "#2563eb",
+          backgroundColor: "#2563eb20",
           fill: true,
           tension: 0.4,
           pointRadius: 0,
@@ -2507,12 +2479,12 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
       responsive: true,
       scales: {
         x: {
-          ticks: { color: "#737373", font: { size: 9 }, maxTicksLimit: 7 },
+          ticks: { color: "#8a8a9a", font: { size: 9 }, maxTicksLimit: 7 },
           grid: { display: false },
         },
         y: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => v + "%",
           },
@@ -2548,11 +2520,11 @@ function renderCopilotCharts(cpSeatsData, cpHistoryData) {
       responsive: true,
       scales: {
         x: {
-          ticks: { color: "#737373", font: { size: 9 }, maxTicksLimit: 7 },
+          ticks: { color: "#8a8a9a", font: { size: 9 }, maxTicksLimit: 7 },
           grid: { display: false },
         },
         y: {
-          ticks: { color: "#737373", font: { size: 10 } },
+          ticks: { color: "#8a8a9a", font: { size: 10 } },
           grid: { color: "#f0eaf4" },
           beginAtZero: true,
         },
@@ -2739,7 +2711,7 @@ function updateCopilotTokenWarnings(cpSeatsData, orgAiCredits) {
       if (seat.netAmount < APPROACHING_THRESHOLD_USD) return;
 
       const isCritical = seat.netAmount >= CRITICAL_THRESHOLD_USD;
-      const color = "#e8520a";
+      const color = "#d97706";
       // const color = isCritical ? "#ef4444" : "#f59e0b";
 
       listHtml += `
@@ -3071,7 +3043,6 @@ function initWisprChart(wisprData) {
     window.wisprChartInstance.destroy();
   }
 
-  // Use the new brand colors
   window.wisprChartInstance = new Chart(ctx, {
     type: "line",
     data: {
@@ -3080,8 +3051,8 @@ function initWisprChart(wisprData) {
         {
           label: "Desktop",
           data: initialData.desktop,
-          borderColor: "#D946EF", // primary purple
-          backgroundColor: "rgba(217, 70, 239, 0.08)",
+          borderColor: "#115e59",
+          backgroundColor: "rgba(17, 94, 89, 0.04)", // Elegant super-light gradient area tint
           borderWidth: 2,
           fill: true,
           tension: 0.38,
@@ -3091,8 +3062,8 @@ function initWisprChart(wisprData) {
         {
           label: "Mobile",
           data: initialData.mobile,
-          borderColor: "#8B95EE", // accent blue
-          backgroundColor: "rgba(139, 149, 238, 0.08)",
+          borderColor: "#ea580c",
+          backgroundColor: "rgba(234, 88, 12, 0.04)",
           borderWidth: 2,
           fill: true,
           tension: 0.38,
@@ -3108,11 +3079,7 @@ function initWisprChart(wisprData) {
       plugins: {
         legend: {
           position: "bottom",
-          labels: {
-            usePointStyle: true,
-            boxWidth: 6,
-            font: { weight: "500" },
-          },
+          labels: { usePointStyle: true, boxWidth: 6, font: { weight: "500" } },
         },
         tooltip: {
           padding: 12,
@@ -3144,7 +3111,7 @@ function initWisprChart(wisprData) {
     },
   });
 
-  // --- Dropdown interaction (unchanged, only updated hover/active colors) ---
+  // --- PREMIUM MENU COMPONENT CUSTOM INTERACTION ---
   const dropdownBtn = document.getElementById("wisprCustomDropdownBtn");
   const customMenu = document.getElementById("wisprCustomMenu");
   const chevronIcon = document.getElementById("wisprChevronIcon");
@@ -3164,23 +3131,28 @@ function initWisprChart(wisprData) {
     chevronIcon.classList.remove("rotate-180");
   }
 
+  // Toggle dropdown state on main menu click
   dropdownBtn.addEventListener("click", (e) => {
     e.stopPropagation();
     const isOpened = customMenu.classList.contains("scale-100");
     isOpened ? closeDropdown() : openDropdown();
   });
 
+  // Handle menu list item clicks
   optionButtons.forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const value = btn.getAttribute("data-value");
 
+      // Update custom layout texts
       selectedText.textContent =
         value === "weekly" ? "Weekly view" : "Daily view";
 
+      // Visibility transformations for the custom checkmarks
       checkIcons.forEach((icon) => icon.classList.add("hidden"));
       document.getElementById(`check-${value}`).classList.remove("hidden");
 
+      // Refresh Chart.js with the selected granularity context
       const newData = processChartData(value);
       window.wisprChartInstance.data.labels = newData.labels;
       window.wisprChartInstance.data.datasets[0].data = newData.desktop;
@@ -3191,6 +3163,7 @@ function initWisprChart(wisprData) {
     });
   });
 
+  // Dismiss dropdown menu cleanly if clicking anywhere else outside of the toggle container
   document.addEventListener("click", closeDropdown);
 }
 async function fetchRealTimeDashboardData() {
@@ -3381,8 +3354,8 @@ function renderSpend() {
         {
           label: metric,
           data: vals,
-          borderColor: "#b02cce",
-          backgroundColor: "#b02cce12",
+          borderColor: "#9333ea",
+          backgroundColor: "#9333ea12",
           fill: true,
           tension: 0.35,
           pointRadius: 2,
@@ -3394,12 +3367,12 @@ function renderSpend() {
       plugins: { legend: { display: false } },
       scales: {
         x: {
-          ticks: { color: "#737373", font: { size: 10 } },
+          ticks: { color: "#8a8a9a", font: { size: 10 } },
           grid: { display: false },
         },
         y: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -3423,7 +3396,7 @@ function renderClaude() {
       datasets: [
         {
           data: topToday.map((x) => x.val),
-          backgroundColor: "#e879f5",
+          backgroundColor: "#a855f7",
           borderRadius: 4,
         },
       ],
@@ -3448,7 +3421,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             // 2. FIX THE AXIS LABELS (Clean $100, $200 format)
             callback: function (value) {
@@ -3476,7 +3449,7 @@ function renderClaude() {
       datasets: [
         {
           data: topTotal.map((x) => x.val),
-          backgroundColor: "#d946ef",
+          backgroundColor: "#7c3aed",
           borderRadius: 4,
         },
       ],
@@ -3501,7 +3474,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             // 2. FIX THE AXIS LABELS
             callback: function (value) {
@@ -3542,7 +3515,7 @@ function renderClaude() {
       scales: {
         x: {
           ticks: {
-            color: "#737373",
+            color: "#8a8a9a",
             font: { size: 10 },
             callback: (v) => "$" + v,
           },
@@ -3575,7 +3548,7 @@ function renderClaude() {
       plugins: {
         legend: {
           position: "bottom",
-          labels: { color: "#737373", font: { size: 11 }, padding: 10 },
+          labels: { color: "#8a8a9a", font: { size: 11 }, padding: 10 },
         },
       },
     },
