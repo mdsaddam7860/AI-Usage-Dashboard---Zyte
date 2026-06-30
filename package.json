@@ -1,5 +1,5 @@
 {
-  "name": "blueprint",
+  "name": "Ai Usage Dashboard for Zyte",
   "version": "2.0.0",
   "main": "server.js",
   "type": "module",
@@ -17,7 +17,7 @@
     "url": "https://github.com/mdsaddam7860/server-blueprint/issues"
   },
   "homepage": "https://github.com/mdsaddam7860/server-blueprint#readme",
-  "description": "",
+  "description": "Claude + GitHub Copilot usage dashboard for Zyte.",
   "dependencies": {
     "@mohammadsaddam-dev/hubspot-toolkit": "^2.2.0",
     "axios": "^1.16.1",
@@ -27,5 +27,10 @@
     "puppeteer": "^25.2.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0"
-  }
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.2",
+    "tailwindcss": "^4.3.2"
+  },
+  "keywords": []
 }

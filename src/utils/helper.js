@@ -5,8 +5,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CACHE_DIR = path.join(__dirname, "../../", ".cache");
-const CACHE_TTL_MS = 12 * 24 * 60 * 60 * 1000; // 59 minutes
-// const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
+// const CACHE_TTL_MS = 12 * 24 * 60 * 60 * 1000; // 59 minutes
+const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
 import { logger } from "../index.js";
 
 function ensureCacheDir() {
