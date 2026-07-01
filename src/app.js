@@ -46,6 +46,7 @@ app.get("/api/dashboard-data", async (req, res) => {
       is_sample: false,
       claude: claudeData.claude || [],
       claude_seats: claudeData.claude_seats || [],
+      claude_model_daily_usage: claudeData.claude_model_daily_usage || [],
       copilot: copilotData.copilot || [],
       copilot_seats: copilotData.copilot_seats || [],
       org_ai_credits: copilotData.org_ai_credits || {},

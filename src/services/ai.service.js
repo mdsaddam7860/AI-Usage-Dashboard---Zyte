@@ -1,284 +1,9 @@
 import { logger } from "../index.js";
 import axios from "axios";
 import { apiExecutor } from "../utils/executors.js";
-// ── Environment Variables Fallback ─────────────────────
-// The server will use .env variables if present, or headers if passed from the client
-
-// ── Claude Real-Time Fetch Logic ───────────────────────
-// async function fetchClaudeData(apiKey) {
-//   if (!apiKey) return { claude: [], claude_seats: [] };
-
-//   const seats = [];
-//   const rows = [];
-//   const fallbackDate = new Date().toISOString();
-
-//   let page = null;
-//   const headers = { "x-api-key": apiKey, "anthropic-version": "2023-06-01" };
-
-//   try {
-//     do {
-//       const url = new URL(
-//         "https://api.anthropic.com/v1/organizations/spend_limits/effective"
-//       );
-//       url.searchParams.append("limit", "100");
-//       if (page) url.searchParams.append("page", page);
-
-//       const r = await fetch(url, { headers });
-//       if (!r.ok) {
-//         logger.error(`Claude Spend API Error: ${r.status}`);
-//         break;
-//       }
-
-//       const j = await r.json();
-//       for (const item of j.data || []) {
-//         const actor = item.actor || {};
-//         const scope = item.scope || {};
-
-//         const userName = actor.name || "Unknown User";
-//         const email = actor.email_address || "";
-//         const userId = scope.user_id || actor.user_id || "unknown";
-
-//         // Anthropic stores amounts in cents
-//         const limitUsd = parseFloat(item.amount || 0) / 100.0;
-//         const spendUsd = parseFloat(item.period_to_date_spend || 0) / 100.0;
-//         const remainingUsd = Math.max(0, limitUsd - spendUsd);
-
-//         seats.push({
-//           user: userName,
-//           email: email,
-//           user_id: userId,
-//           limit_usd: limitUsd,
-//           spend_usd: spendUsd,
-//           remaining_usd: remainingUsd,
-//           period: item.period || "monthly",
-//         });
-
-//         // Synthesize token metrics for the charts based on spend
-//         if (spendUsd > 0) {
-//           const estTotalTokens = Math.floor(spendUsd * 333333);
-//           rows.push({
-//             date: fallbackDate,
-//             user: userName,
-//             team: "Engineering", // Default fallback
-//             api_key: "managed_seat",
-//             workspace: "Default",
-//             model: "claude-3.5-sonnet",
-//             input_tokens: Math.floor(estTotalTokens * 0.8),
-//             output_tokens: Math.floor(estTotalTokens * 0.2),
-//             total_tokens: estTotalTokens,
-//             cost_usd: spendUsd,
-//           });
-//         }
-//       }
-//       page = j.next_page;
-//     } while (page);
-//   } catch (error) {
-//     logger.error("Failed to fetch Claude data:", {
-//       status: error?.status,
-//       response: error.response?.data,
-//       method: error?.method,
-//       url: error?.config?.url,
-//       headers: error?.config?.headers,
-//       message: error.message,
-//     });
-//   }
-
-//   return { claude: rows, claude_seats: seats };
-// }
-
-// // ── GitHub Copilot Real-Time Fetch Logic ───────────────
-// async function fetchCopilotData(token, org) {
-//   if (!token || !org) return { copilot: [], copilot_seats: [] };
-
-//   const headers = {
-//     Authorization: `Bearer ${token}`,
-//     Accept: "application/vnd.github+json",
-//     "X-GitHub-Api-Version": "2022-11-28",
-//   };
-
-//   const seats = [];
-//   let rows = [];
-//   const fallbackDate = new Date().toISOString();
-
-//   // 1. Fetch Seats
-//   try {
-//     let page = 1;
-//     let hasMore = true;
-
-//     while (hasMore) {
-//       const seatsRes = await fetch(
-//         `https://api.github.com/orgs/${org}/copilot/billing/seats?per_page=100&page=${page}`,
-//         { headers }
-//       );
-//       if (!seatsRes.ok) break;
-
-//       const seatsData = await seatsRes.json();
-//       const batch = seatsData.seats || [];
-//       if (batch.length < 100) hasMore = false;
-//       page++;
-
-//       // Fetch AI credits for this batch concurrently
-//       await Promise.all(
-//         batch.map(async (s) => {
-//           const username = (s.assignee && s.assignee.login) || "unknown";
-//           const teamName =
-//             (s.assigning_team && s.assigning_team.name) || "direct";
-
-//           let creditsSpent = 0.0;
-//           try {
-//             const creditRes = await fetch(
-//               `https://api.github.com/orgs/${org}/settings/billing/ai_credit/usage?user=${username}`,
-//               { headers }
-//             );
-//             if (creditRes.ok) {
-//               const creditData = await creditRes.json();
-//               creditsSpent = (creditData.usageItems || []).reduce(
-//                 (sum, item) => sum + (item.grossQuantity || 0),
-//                 0
-//               );
-//             }
-//           } catch (e) {
-//             logger.error(`Credit fetch failed for ${username}`, {
-//               status: error?.status,
-//               response: error.response?.data,
-//               method: error?.method,
-//               url: error?.config?.url,
-//               headers: error?.config?.headers,
-//               message: error.message,
-//             });
-//           }
-
-//           const budgetLimit = 20.0;
-//           seats.push({
-//             user: username,
-//             team: teamName,
-//             last_activity: (s.last_activity_at || "").substring(0, 10),
-//             last_editor: s.last_activity_editor || "",
-//             plan: s.plan_type || "business",
-//             limit_usd: budgetLimit,
-//             spend_usd: creditsSpent,
-//             remaining_usd: Math.max(0, budgetLimit - creditsSpent),
-//           });
-
-//           // Synthesize fallback chart metrics if the user spent credits
-//           if (creditsSpent > 0) {
-//             const estSuggestions = Math.floor(creditsSpent * 500);
-//             const estAcceptances = Math.floor(estSuggestions * 0.3);
-//             const estTotalTokens = Math.floor(creditsSpent * 250000);
-
-//             rows.push({
-//               date: fallbackDate,
-//               user: username,
-//               team: teamName,
-//               editor: s.last_activity_editor || "vscode",
-//               language: "python",
-//               model: "copilot-ai-credits",
-//               suggestions: estSuggestions,
-//               acceptances: estAcceptances,
-//               lines_suggested: estSuggestions * 3,
-//               lines_accepted: estAcceptances * 2,
-//               chats: Math.floor(creditsSpent * 10),
-//               engaged: 1,
-//               input_tokens: Math.floor(estTotalTokens * 0.8),
-//               output_tokens: Math.floor(estTotalTokens * 0.2),
-//               total_tokens: estTotalTokens,
-//               cost_usd: creditsSpent,
-//             });
-//           }
-//         })
-//       );
-//     }
-//   } catch (error) {
-//     logger.error("Failed to fetch Copilot seats:", {
-//       status: error?.status,
-//       response: error.response?.data,
-//       method: error?.method,
-//       url: error?.config?.url,
-//       headers: error?.config?.headers,
-//       message: error.message,
-//     });
-//   }
-
-//   // 2. Fetch & Parse NDJSON Reports
-//   try {
-//     const repRes = await fetch(
-//       `https://api.github.com/orgs/${org}/copilot/metrics/reports/users-28-day/latest`,
-//       { headers }
-//     );
-//     if (repRes.ok) {
-//       const repData = await repRes.json();
-//       const links = repData.download_links || [];
-//       const parsedRows = [];
-
-//       for (const link of links) {
-//         const dlRes = await fetch(link);
-//         const text = await dlRes.text();
-//         const lines = text.split("\n").filter((line) => line.trim() !== "");
-
-//         for (const line of lines) {
-//           const record = JSON.parse(line);
-//           const date = record.day_partition || "unknown-date";
-//           const username = record.user_login || "unknown-user";
-//           const chats = record.user_initiated_interaction_count || 0;
-//           const models = record.totals_by_language_model || [];
-
-//           if (models.length === 0) {
-//             if (chats > 0 || record.used_chat) {
-//               parsedRows.push({
-//                 date,
-//                 user: username,
-//                 team: "direct",
-//                 editor: "unknown",
-//                 language: "unknown",
-//                 model: "unknown",
-//                 suggestions: 0,
-//                 acceptances: 0,
-//                 lines_suggested: 0,
-//                 lines_accepted: 0,
-//                 chats,
-//                 engaged: 1,
-//               });
-//             }
-//             continue;
-//           }
-
-//           for (const interaction of models) {
-//             parsedRows.push({
-//               date,
-//               user: username,
-//               team: "direct",
-//               editor: interaction.editor || "unknown",
-//               language: interaction.language || "unknown",
-//               model: interaction.model || "unknown",
-//               suggestions: interaction.suggestions_count || 0,
-//               acceptances: interaction.acceptances_count || 0,
-//               lines_suggested: interaction.lines_suggested || 0,
-//               lines_accepted: interaction.lines_accepted || 0,
-//               chats: chats,
-//               engaged: interaction.acceptances_count > 0 ? 1 : 0,
-//             });
-//           }
-//         }
-//       }
-
-//       // If we successfully parsed the NDJSON report, overwrite the synthetic rows
-//       if (parsedRows.length > 0) rows = parsedRows;
-//     }
-//   } catch (error) {
-//     logger.error("Failed to fetch/parse NDJSON reports:", {
-//       status: error?.status,
-//       response: error.response?.data,
-//       method: error?.method,
-//       url: error?.config?.url,
-//       headers: error?.config?.headers,
-//       message: error.message,
-//     });
-//   }
-
-//   return { copilot: rows, copilot_seats: seats };
-// }
 import fs from "fs";
 import path from "path";
+import { TeamObject, getTeam } from "../utils/helper.js";
 
 // ── Cache helpers ──────────────────────────────────────
 const CACHE_DIR = path.resolve(".cache");
@@ -288,8 +13,8 @@ function ensureCacheDir() {
 }
 
 // const CACHE_TTL_MS = 1000; // 5 minutes
-const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
-// const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 59 minutes
+// const CACHE_TTL_MS = 59 * 60 * 1000; // 59 minutes
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 59 minutes
 
 /**
  * Returns cached data if it exists and is younger than CACHE_TTL_MS.
@@ -348,24 +73,38 @@ const ESTIMATION_CONFIG = {
   defaultWorkspace: "estimated",
   defaultModel: "estimated",
 };
-async function fetchClaudeData(apiKey, isRefreshData = false) {
-  if (!apiKey) return { claude: [], claude_seats: [] };
 
-  // 1. Try file cache first
-  const cached = readCache(CLAUDE_CACHE_FILE);
-  if (cached && !isRefreshData) {
-    logger.debug("Claude: loaded from file cache");
-    return cached;
-  }
+const ANALYTICS_HEADERS_VERSION = "2023-06-01";
 
-  logger.info("Fetching Claude data...");
+// ── Date range helper ──────────────────────────────────
+/**
+ * Returns the current billing month as an [starting_at, ending_at] ISO range,
+ * from the 1st of the month 00:00 UTC through "now".
+ */
+function getCurrentMonthRange() {
+  const now = new Date();
+  const start = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0)
+  );
+  return { startingAt: start.toISOString(), endingAt: now.toISOString() };
+}
 
+function sumCacheCreationTokens(cacheCreation) {
+  if (!cacheCreation) return 0;
+  return (
+    (cacheCreation.ephemeral_1h_input_tokens || 0) +
+    (cacheCreation.ephemeral_5m_input_tokens || 0)
+  );
+}
+
+// ── 1. Spend / seat limits ─────────────────────────────
+async function fetchSpendLimits(apiKey) {
   const seats = [];
-  const rows = [];
-  const fallbackDate = new Date().toISOString();
-
+  const headers = {
+    "x-api-key": apiKey,
+    "anthropic-version": ANALYTICS_HEADERS_VERSION,
+  };
   let page = null;
-  const headers = { "x-api-key": apiKey, "anthropic-version": "2023-06-01" };
 
   try {
     do {
@@ -403,51 +142,410 @@ async function fetchClaudeData(apiKey, isRefreshData = false) {
           spend_usd: spendUsd,
           remaining_usd: remainingUsd,
           period: item.period || "monthly",
+          team: getTeam(email) || ESTIMATION_CONFIG.defaultTeam,
         });
-
-        if (spendUsd > 0) {
-          const estTotalTokens = Math.floor(
-            spendUsd * ESTIMATION_CONFIG.tokensPerUsd
-          );
-
-          rows.push({
-            date: fallbackDate,
-            user: userName,
-            team: ESTIMATION_CONFIG.defaultTeam,
-            api_key: ESTIMATION_CONFIG.defaultApiKey,
-            workspace: ESTIMATION_CONFIG.defaultWorkspace,
-            model: ESTIMATION_CONFIG.defaultModel,
-            input_tokens: Math.floor(
-              estTotalTokens * ESTIMATION_CONFIG.inputRatio
-            ),
-            output_tokens: Math.floor(
-              estTotalTokens * ESTIMATION_CONFIG.outputRatio
-            ),
-            total_tokens: estTotalTokens,
-            cost_usd: spendUsd,
-            estimated: true,
-          });
-        }
       }
       page = j.next_page;
     } while (page);
   } catch (error) {
-    logger.error("Failed to fetch Claude data:", {
+    logger.error("Failed to fetch Claude spend limits:", {
       status: error?.response?.status || error?.status,
       message: error.message,
     });
   }
 
+  return seats;
+}
+
+// ── 2. Per-user, per-model usage (analytics/user_usage_report) ─────
+async function fetchUserModelUsage(apiKey, startingAt, endingAt) {
+  const records = [];
+  const headers = {
+    "x-api-key": apiKey,
+    "anthropic-version": ANALYTICS_HEADERS_VERSION,
+  };
+  let page = null;
+
+  try {
+    do {
+      const params = {
+        starting_at: startingAt,
+        ending_at: endingAt,
+        limit: 1000,
+        "group_by[]": "model",
+      };
+      if (page) params.page = page;
+
+      const r = await apiExecutor(() =>
+        axios({
+          method: "GET",
+          url: "https://api.anthropic.com/v1/organizations/analytics/user_usage_report",
+          headers,
+          params,
+        })
+      );
+
+      const j = r.data;
+      for (const item of j.data || []) {
+        records.push(item);
+      }
+      page = j.next_page || null;
+    } while (page);
+  } catch (error) {
+    logger.error("Failed to fetch Claude user/model usage report:", {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+    });
+  }
+
+  return records;
+}
+
+// ── 3. Org-wide daily usage per model (usage_report/messages) ──────
+async function fetchDailyModelUsage(
+  apiKey,
+  startingAt = "2026-06-01T00:00:00Z",
+  endingAt
+) {
+  const rows = [];
+  const headers = {
+    "x-api-key": apiKey,
+    "anthropic-version": ANALYTICS_HEADERS_VERSION,
+  };
+  let page = null;
+
+  try {
+    do {
+      const params = {
+        starting_at: startingAt,
+        ending_at: endingAt,
+        bucket_width: "1d",
+        limit: 31,
+        "group_by[]": "model",
+      };
+      if (page) params.page = page;
+
+      const r = await apiExecutor(() =>
+        axios({
+          method: "GET",
+          url: "https://api.anthropic.com/v1/organizations/usage_report/messages",
+          headers,
+          params,
+        })
+      );
+
+      const j = r.data;
+      const buckets = j.data || j.results || j.buckets || [];
+      logger.info(
+        `Daily Model Usage: status=${r.status} buckets=${
+          buckets.length
+        } keys=${Object.keys(j).join(",")}`
+      );
+      if (buckets.length === 0) {
+        logger.debug(`Daily Model Usage raw response: ${JSON.stringify(j)}`);
+      }
+      for (const bucket of buckets) {
+        const date = bucket.starting_at;
+        for (const result of bucket.results || []) {
+          const uncached = result.uncached_input_tokens || 0;
+          const cacheCreation = sumCacheCreationTokens(result.cache_creation);
+          const cacheRead = result.cache_read_input_tokens || 0;
+          const outputTokens = result.output_tokens || 0;
+
+          rows.push({
+            date,
+            ending_at: bucket.ending_at,
+            model: result.model || "unknown",
+            input_tokens: uncached + cacheCreation + cacheRead,
+            output_tokens: outputTokens,
+            total_tokens: uncached + cacheCreation + cacheRead + outputTokens,
+            uncached_input_tokens: uncached,
+            cache_creation_tokens: cacheCreation,
+            cache_read_input_tokens: cacheRead,
+            web_search_requests:
+              result.server_tool_use?.web_search_requests || 0,
+            service_tier: result.service_tier || null,
+          });
+        }
+      }
+      page = j.next_page || null;
+    } while (page);
+  } catch (error) {
+    logger.error("Failed to fetch Claude daily model usage:", {
+      status: error?.response?.status || error?.status,
+      message: error.message,
+    });
+  }
+
+  return rows;
+}
+
+// ── Row builder: turns a user_usage_report record into a "rows" entry ──
+function buildUsageRow(item, fallbackDate) {
+  const actor = item.actor || {};
+  const uncached = item.uncached_input_tokens || 0;
+  const cacheCreation = sumCacheCreationTokens(item.cache_creation);
+  const cacheRead = item.cache_read_input_tokens || 0;
+  const outputTokens = item.output_tokens || 0;
+  const totalTokens =
+    item.total_tokens != null
+      ? item.total_tokens
+      : uncached + cacheCreation + cacheRead + outputTokens;
+
+  return {
+    date: fallbackDate,
+    user: actor.name || "Unknown User",
+    email: actor.email || "",
+    user_id: actor.user_id || "unknown",
+    team: getTeam(actor.email) || ESTIMATION_CONFIG.defaultTeam,
+    api_key: ESTIMATION_CONFIG.defaultApiKey,
+    workspace: ESTIMATION_CONFIG.defaultWorkspace,
+    model: item.model || "unknown",
+    input_tokens: uncached + cacheCreation + cacheRead,
+    output_tokens: outputTokens,
+    total_tokens: totalTokens,
+    uncached_input_tokens: uncached,
+    cache_creation_tokens: cacheCreation,
+    cache_read_input_tokens: cacheRead,
+    requests: item.requests || 0,
+    web_search_requests: item.server_tool_use?.web_search_requests || 0,
+    cost_usd: 0, // filled in below via allocateCosts()
+    cost_usd_allocated: true,
+    estimated: false,
+  };
+}
+
+/**
+ * Distributes each user's spend_usd (from the seats/spend-limits endpoint) across
+ * that user's model rows, weighted by total_tokens share. Anthropic's usage-report
+ * endpoints don't return a per-model cost, so this is a best-effort allocation,
+ * not an actual per-model billed amount.
+ */
+function allocateCosts(rows, seats) {
+  const spendByUser = new Map();
+  for (const seat of seats) {
+    spendByUser.set(seat.user_id, seat.spend_usd || 0);
+  }
+
+  const totalsByUser = new Map();
+  for (const row of rows) {
+    const prev = totalsByUser.get(row.user_id) || 0;
+    totalsByUser.set(row.user_id, prev + row.total_tokens);
+  }
+
+  for (const row of rows) {
+    const userSpend = spendByUser.get(row.user_id) || 0;
+    const userTotalTokens = totalsByUser.get(row.user_id) || 0;
+    row.cost_usd =
+      userTotalTokens > 0
+        ? (userSpend * row.total_tokens) / userTotalTokens
+        : 0;
+  }
+}
+
+/**
+ * Fallback: for any user who has spend_usd > 0 but no rows in the usage report
+ * (e.g. spend not attributable to a tracked model), synthesize a single
+ * "estimated" row the old way, so spend never silently disappears.
+ */
+function fillEstimatedGaps(rows, seats, fallbackDate) {
+  const usersWithRows = new Set(rows.map((r) => r.user_id));
+
+  for (const seat of seats) {
+    if (seat.spend_usd > 0 && !usersWithRows.has(seat.user_id)) {
+      const estTotalTokens = Math.floor(
+        seat.spend_usd * ESTIMATION_CONFIG.tokensPerUsd
+      );
+
+      rows.push({
+        date: fallbackDate,
+        user: seat.user,
+        email: seat.email,
+        user_id: seat.user_id,
+        team: getTeam(seat.email) || ESTIMATION_CONFIG.defaultTeam,
+        api_key: ESTIMATION_CONFIG.defaultApiKey,
+        workspace: ESTIMATION_CONFIG.defaultWorkspace,
+        model: ESTIMATION_CONFIG.defaultModel,
+        input_tokens: Math.floor(estTotalTokens * ESTIMATION_CONFIG.inputRatio),
+        output_tokens: Math.floor(
+          estTotalTokens * ESTIMATION_CONFIG.outputRatio
+        ),
+        total_tokens: estTotalTokens,
+        uncached_input_tokens: 0,
+        cache_creation_tokens: 0,
+        cache_read_input_tokens: 0,
+        requests: 0,
+        web_search_requests: 0,
+        cost_usd: seat.spend_usd,
+        cost_usd_allocated: false,
+        estimated: true,
+      });
+    }
+  }
+}
+
+// ── Main entry point ────────────────────────────────────
+async function fetchClaudeData(apiKey, isRefreshData = true) {
+  if (!apiKey)
+    return { claude: [], claude_seats: [], claude_model_daily_usage: [] };
+
+  // 1. Try file cache first
+  const cached = readCache(CLAUDE_CACHE_FILE);
+  if (cached && !isRefreshData) {
+    logger.debug("Claude: loaded from file cache");
+    return cached;
+  }
+
+  logger.info("Fetching Claude data...");
+
+  const fallbackDate = new Date().toISOString();
+  const { startingAt, endingAt } = getCurrentMonthRange();
+  logger.info(`Starting at: ${startingAt}, ending at: ${endingAt}`);
+
+  // Fetch all three data sources. Each is independently try/caught internally,
+  // so a failure in one doesn't block the others.
+  const [seats, usageRecords, dailyModelUsage] = await Promise.all([
+    fetchSpendLimits(process.env.STANDARD_ANTHROPIC_KEY),
+    fetchUserModelUsage(
+      process.env.ANALYTICS_ANTHROPIC_KEY,
+      startingAt,
+      endingAt
+    ),
+    fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY),
+    // fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY, startingAt, endingAt),
+  ]);
+
+  const rows = usageRecords.map((item) => buildUsageRow(item, fallbackDate));
+
+  allocateCosts(rows, seats);
+  fillEstimatedGaps(rows, seats, fallbackDate);
+
   logger.debug(`Claude : ${JSON.stringify(rows, null, 2)}`);
   logger.debug(`Claude seats : ${JSON.stringify(seats, null, 2)}`);
+  logger.debug(
+    `Claude daily model usage : ${JSON.stringify(dailyModelUsage, null, 2)}`
+  );
 
-  const result = { claude: rows, claude_seats: seats };
+  const result = {
+    claude: rows,
+    claude_seats: seats,
+    claude_model_daily_usage: dailyModelUsage,
+  };
 
   // 2. Persist to file cache
   writeCache(CLAUDE_CACHE_FILE, result);
 
   return result;
 }
+
+// fetchDailyModelUsage is kept (unused by default) in case you later want a
+// daily time-series chart for model usage, which aggregateModelUsage can't
+// provide since it collapses the whole date range into one total per model.
+
+// fetchDailyModelUsage is kept (unused by default) in case you later want a
+// daily time-series chart for model usage, which aggregateModelUsage can't
+// provide since it collapses the whole date range into one total per model.
+
+// async function fetchClaudeData(apiKey, isRefreshData = false) {
+//   if (!apiKey) return { claude: [], claude_seats: [] };
+
+//   // 1. Try file cache first
+//   const cached = readCache(CLAUDE_CACHE_FILE);
+//   if (cached && !isRefreshData) {
+//     logger.debug("Claude: loaded from file cache");
+//     return cached;
+//   }
+
+//   logger.info("Fetching Claude data...");
+
+//   const seats = [];
+//   const rows = [];
+//   const fallbackDate = new Date().toISOString();
+
+//   let page = null;
+//   const headers = { "x-api-key": apiKey, "anthropic-version": "2023-06-01" };
+
+//   try {
+//     do {
+//       const params = { limit: 100 };
+//       if (page) params.page = page;
+
+//       const r = await apiExecutor(() =>
+//         axios({
+//           method: "GET",
+//           url: "https://api.anthropic.com/v1/organizations/spend_limits/effective",
+//           headers,
+//           params,
+//         })
+//       );
+
+//       const j = r.data;
+
+//       for (const item of j.data || []) {
+//         const actor = item.actor || {};
+//         const scope = item.scope || {};
+
+//         const userName = actor.name || "Unknown User";
+//         const email = actor.email_address || "";
+//         const userId = scope.user_id || actor.user_id || "unknown";
+
+//         const limitUsd = parseFloat(item.amount || 0) / 100.0;
+//         const spendUsd = parseFloat(item.period_to_date_spend || 0) / 100.0;
+//         const remainingUsd = Math.max(0, limitUsd - spendUsd);
+
+//         seats.push({
+//           user: userName,
+//           email,
+//           user_id: userId,
+//           limit_usd: limitUsd,
+//           spend_usd: spendUsd,
+//           remaining_usd: remainingUsd,
+//           period: item.period || "monthly",
+//         });
+
+//         if (spendUsd > 0) {
+//           const estTotalTokens = Math.floor(
+//             spendUsd * ESTIMATION_CONFIG.tokensPerUsd
+//           );
+
+//           rows.push({
+//             date: fallbackDate,
+//             user: userName,
+//             team: ESTIMATION_CONFIG.defaultTeam,
+//             api_key: ESTIMATION_CONFIG.defaultApiKey,
+//             workspace: ESTIMATION_CONFIG.defaultWorkspace,
+//             model: ESTIMATION_CONFIG.defaultModel,
+//             input_tokens: Math.floor(
+//               estTotalTokens * ESTIMATION_CONFIG.inputRatio
+//             ),
+//             output_tokens: Math.floor(
+//               estTotalTokens * ESTIMATION_CONFIG.outputRatio
+//             ),
+//             total_tokens: estTotalTokens,
+//             cost_usd: spendUsd,
+//             estimated: true,
+//           });
+//         }
+//       }
+//       page = j.next_page;
+//     } while (page);
+//   } catch (error) {
+//     logger.error("Failed to fetch Claude data:", {
+//       status: error?.response?.status || error?.status,
+//       message: error.message,
+//     });
+//   }
+
+//   logger.debug(`Claude : ${JSON.stringify(rows, null, 2)}`);
+//   logger.debug(`Claude seats : ${JSON.stringify(seats, null, 2)}`);
+
+//   const result = { claude: rows, claude_seats: seats };
+
+//   // 2. Persist to file cache
+//   writeCache(CLAUDE_CACHE_FILE, result);
+
+//   return result;
+// }
 
 // ── GitHub Copilot Real-Time Fetch Logic ───────────────
 const COPILOT_CACHE_FILE = "copilot_data.json";
@@ -998,4 +1096,4 @@ async function fetchCopilotData(token, org, isRefreshData = false) {
   return result;
 }
 
-export { fetchClaudeData, fetchCopilotData };
+export { fetchClaudeData, fetchCopilotData, fetchUserModelUsage };

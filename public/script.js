@@ -2708,6 +2708,13 @@ const normalizedSeats = cpSeatsData
 // ── Tokens by Model donut ──────────────────────────────
 function updateCopilotTokenWarnings(cpSeatsData, orgAiCredits) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
+  console.log(
+    `Rendering Executive Charts for ${JSON.stringify()} Copilot seats and ${JSON.stringify(
+      orgAiCredits,
+      null,
+      2
+    )} AI Credits`
+  );
 
   const criticalContainer = document.getElementById("critical-dollars-list");
 
@@ -3193,6 +3200,274 @@ function initWisprChart(wisprData) {
 
   document.addEventListener("click", closeDropdown);
 }
+
+// ── Model Usage Doughnut (v2 — new IDs, design-token palette) ──────
+// Targets: #modelDoughnutChart, #modelDoughnutLegend, #modelDoughnutTotalValue
+// Color tokens (from design system):
+//   primary/500                #D946EF
+//   accentPrimary/500          #8B95EE
+//   accentSecondary/500        #E8520A
+//   accentSecondaryPurple/500  #B02CCE
+//   neutral/500                #737373
+//   headlineGradient/DEFAULT   linear-gradient(90deg, #E8520A 0%, #C026D3 100%)
+
+const DOUGHNUT_PALETTE = [
+  "#D946EF", // primary/500
+  "#8B95EE", // accentPrimary/500
+  "#E8520A", // accentSecondary/500
+  "#B02CCE", // accentSecondaryPurple/500
+  "#737373", // neutral/500
+];
+
+// If there are more models than palette colors, cycle through the palette
+// again at reduced opacity rather than repeating solid colors identically.
+function getDoughnutColor(index) {
+  const base = DOUGHNUT_PALETTE[index % DOUGHNUT_PALETTE.length];
+  const cycle = Math.floor(index / DOUGHNUT_PALETTE.length);
+  if (cycle === 0) return base;
+  const alphaByCycle = ["E6", "CC", "B3", "99"]; // ~90%, 80%, 70%, 60% opacity
+  const alpha = alphaByCycle[(cycle - 1) % alphaByCycle.length];
+  return base + alpha;
+}
+
+function formatTokensShort(n) {
+  if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + "B";
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+}
+
+function escapeHtmlV2(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
+ * Aggregates raw per-day/per-model usage rows into a sorted totals list.
+ * Expects rows shaped like: { model, total_tokens, ... }
+ * (matches the `claude_model_daily_usage` array from fetchDailyModelUsage).
+ */
+function aggregateTokensByModelV2(dailyModelUsageRows = []) {
+  const totals = new Map();
+  for (const row of dailyModelUsageRows || []) {
+    const model = row.model || "unknown";
+    const tokens = row.total_tokens || 0;
+    totals.set(model, (totals.get(model) || 0) + tokens);
+  }
+  return [...totals.entries()]
+    .map(([model, tokens]) => ({ model, tokens }))
+    .sort((a, b) => b.tokens - a.tokens);
+}
+
+let modelDoughnutChartInstance = null;
+
+/**
+ * Renders the "Tokens by Model" doughnut + legend + center total into the
+ * new #modelDoughnutChart / #modelDoughnutLegend / #modelDoughnutTotalValue
+ * elements. Logs loudly instead of failing silently, since the previous
+ * version's failure mode was hard to diagnose.
+ *
+ * @param {Array} data - raw daily-usage rows (opts.raw = true) OR
+ *                        pre-aggregated [{ model, tokens }, ...]
+ * @param {Object} opts
+ * @param {boolean} opts.raw
+ */
+function renderModelTokenDoughnut(data, { raw = false } = {}) {
+  if (typeof Chart === "undefined") {
+    console.error(
+      "renderModelTokenDoughnut: Chart.js is not loaded — the <script> for Chart.js must run before this function is called."
+    );
+    return;
+  }
+
+  const canvas = document.getElementById("modelDoughnutChart");
+  const legendEl = document.getElementById("modelDoughnutLegend");
+  const totalEl = document.getElementById("modelDoughnutTotalValue");
+
+  if (!canvas || !legendEl) {
+    console.error(
+      "renderModelTokenDoughnut: expected elements not found in DOM (#modelDoughnutChart / #modelDoughnutLegend). Check that model_doughnut_card.html was inserted before this runs."
+    );
+    return;
+  }
+
+  const modelTotals = raw ? aggregateTokensByModelV2(data) : data || [];
+
+  if (!modelTotals.length) {
+    legendEl.innerHTML =
+      '<div style="color:#737373;font-size:12px;">No model usage data yet</div>';
+    if (totalEl) totalEl.textContent = "—";
+    if (modelDoughnutChartInstance) {
+      modelDoughnutChartInstance.destroy();
+      modelDoughnutChartInstance = null;
+    }
+    return;
+  }
+
+  const labels = modelTotals.map((m) => m.model);
+  const values = modelTotals.map((m) => m.tokens);
+  const colors = modelTotals.map((_, i) => getDoughnutColor(i));
+  const totalTokens = values.reduce((a, b) => a + b, 0);
+
+  if (totalEl) totalEl.textContent = formatTokensShort(totalTokens);
+
+  if (modelDoughnutChartInstance) {
+    modelDoughnutChartInstance.data.labels = labels;
+    modelDoughnutChartInstance.data.datasets[0].data = values;
+    modelDoughnutChartInstance.data.datasets[0].backgroundColor = colors;
+    modelDoughnutChartInstance.update();
+  } else {
+    modelDoughnutChartInstance = new Chart(canvas.getContext("2d"), {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [
+          {
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 2,
+            borderColor: "#ffffff",
+          },
+        ],
+      },
+      options: {
+        // ◄ CHANGED: Let the parent 180x180 div control the size
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: "72%",
+        layout: {
+          // ◄ ADDED: Prevents the 2px border from clipping the edge of the canvas
+          padding: 4,
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const pct =
+                  totalTokens > 0
+                    ? ((ctx.raw / totalTokens) * 100).toFixed(1)
+                    : "0.0";
+                return `${ctx.label}: ${formatTokensShort(
+                  ctx.raw
+                )} tokens (${pct}%)`;
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  renderModelDoughnutLegend(modelTotals, colors, totalTokens, legendEl);
+}
+
+// Keep your legend function exactly as it was
+function renderModelDoughnutLegend(modelTotals, colors, totalTokens, legendEl) {
+  legendEl.innerHTML = modelTotals
+    .map((m, i) => {
+      const pct =
+        totalTokens > 0 ? ((m.tokens / totalTokens) * 100).toFixed(1) : "0.0";
+      return `
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+          <span style="width:10px;height:10px;border-radius:2px;background:${
+            colors[i]
+          };flex-shrink:0;"></span>
+          <span style="color:#1a1a2e;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtmlV2(
+            m.model
+          )}</span>
+          <span style="color:#737373;margin-left:auto;white-space:nowrap;">${formatTokensShort(
+            m.tokens
+          )} · ${pct}%</span>
+        </div>`;
+    })
+    .join("");
+}
+
+// ── Theme Colors ──────────────────────────────────────────
+const BRAND_COLORS = [
+  "#D946EF", // primary/500
+  "#8B95EE", // accentPrimary/500
+  "#E8520A", // accentSecondary/500
+  "#B02CCE", // accentSecondaryPurple/500
+  "#737373", // neutral/500
+  "#9333EA", // Extra fallback purple
+  "#F97316", // Extra fallback orange
+];
+// ── 1. Team Token Doughnut Logic ──────────────────────────
+let teamTokenDoughnutChartInstance = null;
+
+function processTeamTokenUsage(claudeData) {
+  if (!claudeData || !Array.isArray(claudeData))
+    return { labels: [], data: [] };
+
+  const teamMap = {};
+  claudeData.forEach((row) => {
+    const teamName = row.team || "Unassigned";
+    teamMap[teamName] = (teamMap[teamName] || 0) + (row.total_tokens || 0);
+  });
+
+  const sortedTeams = Object.keys(teamMap)
+    .map((team) => ({ team, tokens: teamMap[team] }))
+    .sort((a, b) => b.tokens - a.tokens);
+
+  return {
+    labels: sortedTeams.map((item) => item.team),
+    data: sortedTeams.map((item) => item.tokens),
+  };
+}
+function renderTeamTokenDoughnut(claudeData) {
+  const chartCanvas = document.getElementById("teamTokenDoughnutChart");
+  if (!chartCanvas) return;
+
+  const { labels, data } = processTeamTokenUsage(claudeData);
+
+  if (teamTokenDoughnutChartInstance) {
+    teamTokenDoughnutChartInstance.destroy();
+  }
+
+  teamTokenDoughnutChartInstance = new Chart(chartCanvas, {
+    type: "doughnut",
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: "Total Tokens Used",
+          data: data,
+          backgroundColor: BRAND_COLORS,
+          borderWidth: 0,
+          hoverOffset: 4,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: "70%",
+      plugins: {
+        legend: {
+          position: "right",
+          labels: {
+            usePointStyle: true,
+            boxWidth: 8,
+            font: { family: "Inter, sans-serif", size: 12 },
+          },
+        },
+        tooltip: {
+          callbacks: {
+            label: function (context) {
+              return ` ${context.label}: ${new Intl.NumberFormat(
+                "en-US"
+              ).format(context.parsed)} tokens`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 async function fetchRealTimeDashboardData() {
   const refreshBtn = document.getElementById("refresh-icon");
   try {
@@ -3224,6 +3499,8 @@ async function fetchRealTimeDashboardData() {
             ? Math.min(Math.round((s.spend_usd / s.limit_usd) * 100), 100)
             : 0,
       }));
+
+      console.log("Claude Members:", clMembers);
 
       const sortedBySpend = [...clMembers]
         .filter((m) => m.spend > 0)
@@ -3320,8 +3597,9 @@ async function fetchRealTimeDashboardData() {
     renderClaude();
     renderCopilot();
     renderClModelChart(payload.claude);
-
-    // FIXED: Renamed to match the User Bar Chart we just created!
+    console.log("claude_model_daily_usage", payload.claude_model_daily_usage);
+    renderModelTokenDoughnut(payload.claude_model_daily_usage, { raw: true }); // TODO Working on it.
+    renderTeamTokenDoughnut(payload.claude);
     renderUserSpendChart(cpSeatsData, payload?.org_ai_credits);
     console.log(`org_ai_credits`, payload);
     renderExecutiveCharts(clMembers, cpSeatsData);

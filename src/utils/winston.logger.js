@@ -104,14 +104,14 @@ const productionLogger = () => {
 };
 
 const developementLogger = function () {
-  // const Error = new transports.DailyRotateFile({
-  //   filename: "winstonLogs/Dev-Error-%DATE%.log",
-  //   datePattern: "YYYY-MM-DD",
-  //   level: "error",
-  //   zippedArchive: true,
-  //   maxSize: "10m",
-  //   maxFiles: "28d", // keep 28 days of logs
-  // });
+  const Error = new transports.DailyRotateFile({
+    filename: "winstonLogs/Dev-Combined-${getDate()}.log",
+    datePattern: "YYYY-MM-DD",
+    level: "error",
+    zippedArchive: true,
+    maxSize: "10m",
+    maxFiles: "28d", // keep 28 days of logs
+  });
 
   // const Dev = new transports.DailyRotateFile({
   //   filename: "winstonLogs/Dev-Combined-%DATE%.log",
@@ -169,7 +169,7 @@ const developementLogger = function () {
     //   }),
     // ],
     transports: [
-      // Error,
+      Error,
       // Combined,
       Console,
       Dev,

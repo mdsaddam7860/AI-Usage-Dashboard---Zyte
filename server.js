@@ -6,6 +6,10 @@ import { scrapeWisprData2 } from "./src/integrations/wispr/test.js";
 import { scrapeWisprData } from "./src/integrations/wispr/wisprScraper.js";
 import { testWisprScrapingWithHTML } from "./src/controllers/test.js";
 import { fetchWisprData } from "./src/integrations/wispr/wispr.js";
+import {
+  fetchClaudeData,
+  fetchUserModelUsage,
+} from "./src/services/ai.service.js";
 // import "./src/jobs/claudeAndCopilot.poller.js";
 
 // Start the server, For CI/CD deployments remove deploy.yml from .gitignore
@@ -58,3 +62,11 @@ async function init() {
     logger.error("❌ Critical startup failure:", error);
   }
 }
+
+const data = await fetchClaudeData(process.env.ANALYTICS_ANTHROPIC_KEY);
+
+// logger.info(`Claude data: ${JSON.stringify(data, null, 2)}`);
+// logger.info(
+//   `Claude data: ${JSON.stringify(data.claude_model_daily_usage, null, 2)}`
+// );
+// logger.info(`claude_model_usage: ${JSON.stringify(data.claude_model_usage)}`);
