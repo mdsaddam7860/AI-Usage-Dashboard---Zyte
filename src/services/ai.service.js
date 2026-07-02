@@ -385,6 +385,58 @@ function fillEstimatedGaps(rows, seats, fallbackDate) {
 }
 
 // ── Main entry point ────────────────────────────────────
+// async function fetchClaudeData(apiKey, isRefreshData = true) {
+//   if (!apiKey)
+//     return { claude: [], claude_seats: [], claude_model_daily_usage: [] };
+
+//   // 1. Try file cache first
+//   const cached = readCache(CLAUDE_CACHE_FILE);
+//   if (cached && !isRefreshData) {
+//     logger.debug("Claude: loaded from file cache");
+//     return cached;
+//   }
+
+//   logger.info("Fetching Claude data...");
+
+//   const fallbackDate = new Date().toISOString();
+//   const { startingAt, endingAt } = getCurrentMonthRange();
+//   logger.info(`Starting at: ${startingAt}, ending at: ${endingAt}`);
+
+//   // Fetch all three data sources. Each is independently try/caught internally,
+//   // so a failure in one doesn't block the others.
+//   const [seats, usageRecords, dailyModelUsage] = await Promise.all([
+//     fetchSpendLimits(process.env.STANDARD_ANTHROPIC_KEY),
+//     fetchUserModelUsage(
+//       process.env.ANALYTICS_ANTHROPIC_KEY,
+//       startingAt,
+//       endingAt
+//     ),
+//     // fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY),
+//     fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY, startingAt, endingAt),
+//   ]);
+
+//   const rows = usageRecords.map((item) => buildUsageRow(item, fallbackDate));
+
+//   allocateCosts(rows, seats);
+//   fillEstimatedGaps(rows, seats, fallbackDate);
+
+//   logger.debug(`Claude : ${JSON.stringify(rows, null, 2)}`);
+//   logger.debug(`Claude seats : ${JSON.stringify(seats, null, 2)}`);
+//   logger.debug(
+//     `Claude daily model usage : ${JSON.stringify(dailyModelUsage, null, 2)}`
+//   );
+
+//   const result = {
+//     claude: rows,
+//     claude_seats: seats,
+//     claude_model_daily_usage: dailyModelUsage,
+//   };
+
+//   // 2. Persist to file cache
+//   writeCache(CLAUDE_CACHE_FILE, result);
+
+//   return result;
+// }
 async function fetchClaudeData(apiKey, isRefreshData = true) {
   if (!apiKey)
     return { claude: [], claude_seats: [], claude_model_daily_usage: [] };
@@ -400,7 +452,25 @@ async function fetchClaudeData(apiKey, isRefreshData = true) {
 
   const fallbackDate = new Date().toISOString();
   const { startingAt, endingAt } = getCurrentMonthRange();
-  logger.info(`Starting at: ${startingAt}, ending at: ${endingAt}`);
+  logger.info(
+    `Original range - Starting at: ${startingAt}, ending at: ${endingAt}`
+  );
+
+  // --- Date Fix for Daily Model Usage ---
+  // Ensure start and end dates are not the exact same day
+  let modelEndingAt = endingAt;
+  const startDateOnly = startingAt.substring(0, 10);
+  const endDateOnly = endingAt.substring(0, 10);
+
+  if (startDateOnly === endDateOnly) {
+    const adjustedEnd = new Date(endingAt);
+    adjustedEnd.setDate(adjustedEnd.getDate() + 1); // Add 1 day
+    modelEndingAt = adjustedEnd.toISOString();
+    logger.info(
+      `Adjusted modelEndingAt to: ${modelEndingAt} to avoid identical dates`
+    );
+  }
+  // --------------------------------------
 
   // Fetch all three data sources. Each is independently try/caught internally,
   // so a failure in one doesn't block the others.
@@ -411,8 +481,12 @@ async function fetchClaudeData(apiKey, isRefreshData = true) {
       startingAt,
       endingAt
     ),
-    fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY),
-    // fetchDailyModelUsage(process.env.ADMIN_ANTHROPIC_KEY, startingAt, endingAt),
+    // Use the adjusted ending date here to ensure there's a valid gap
+    fetchDailyModelUsage(
+      process.env.ADMIN_ANTHROPIC_KEY,
+      startingAt,
+      modelEndingAt
+    ),
   ]);
 
   const rows = usageRecords.map((item) => buildUsageRow(item, fallbackDate));
@@ -437,7 +511,6 @@ async function fetchClaudeData(apiKey, isRefreshData = true) {
 
   return result;
 }
-
 // fetchDailyModelUsage is kept (unused by default) in case you later want a
 // daily time-series chart for model usage, which aggregateModelUsage can't
 // provide since it collapses the whole date range into one total per model.
