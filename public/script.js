@@ -1722,9 +1722,9 @@ function updateCopilotDashboard(cpRows, cpSeatsData) {
   if (!cpRows) cpRows = [];
 
   // ============ DEBUG START ============
-  console.log("=== updateCopilotDashboard DEBUG ===");
-  console.log("cpSeatsData count:", cpSeatsData[0]);
-  console.log("cpRows count:", cpRows[0]);
+  // console.log("=== updateCopilotDashboard DEBUG ===");
+  // console.log("cpSeatsData count:", cpSeatsData[0]);
+  // console.log("cpRows count:", cpRows[0]);
 
   const set = (id, val) => {
     const el = document.getElementById(id);
@@ -2267,7 +2267,7 @@ function renderUserSpendChart(cpSeatsData, orgAiCredits) {
       safeOrgData = orgAiCredits.org_ai_credits;
     }
     const budget = safeOrgData ? safeOrgData.budget_usd || 0 : 0;
-    console.log("DEBUG: Extracted Budget:", budget);
+    // console.log("DEBUG: Extracted Budget:", budget);
 
     // 4. Subtitle DOM Check
     const cardSub = document.getElementById("org-spend-subtitle");
@@ -2708,13 +2708,13 @@ const normalizedSeats = cpSeatsData
 // ── Tokens by Model donut ──────────────────────────────
 function updateCopilotTokenWarnings(cpSeatsData, orgAiCredits) {
   if (!cpSeatsData || cpSeatsData.length === 0) return;
-  console.log(
-    `Rendering Executive Charts for ${JSON.stringify()} Copilot seats and ${JSON.stringify(
-      orgAiCredits,
-      null,
-      2
-    )} AI Credits`
-  );
+  // console.log(
+  //   `Rendering Executive Charts for ${JSON.stringify()} Copilot seats and ${JSON.stringify(
+  //     orgAiCredits,
+  //     null,
+  //     2
+  //   )} AI Credits`
+  // );
 
   const criticalContainer = document.getElementById("critical-dollars-list");
 
@@ -2859,7 +2859,7 @@ function sortWisprUsersByRole(users) {
   });
 }
 function renderWisprUsers(wisprUsers) {
-  console.log("🔍 renderWisprUsers called with:", wisprUsers);
+  // console.log(" renderWisprUsers called with:", wisprUsers);
 
   const container = document.getElementById("wispr-user-list");
   if (!container) {
@@ -2988,7 +2988,6 @@ function renderWisprUsers(wisprUsers) {
     });
 
     container.innerHTML = html;
-    console.log("✅ Wispr users rendered successfully.");
   } catch (error) {
     console.error("❌ Error rendering Wispr users:", error);
     container.innerHTML = `
@@ -3500,7 +3499,7 @@ async function fetchRealTimeDashboardData() {
             : 0,
       }));
 
-      console.log("Claude Members:", clMembers);
+      // console.log("Claude Members:", clMembers);
 
       const sortedBySpend = [...clMembers]
         .filter((m) => m.spend > 0)
@@ -3533,7 +3532,7 @@ async function fetchRealTimeDashboardData() {
           labels: Object.keys(modelMap),
           values: Object.values(modelMap),
         };
-        console.log("Mapped Model Data:", clModelData);
+        // console.log("Mapped Model Data:", clModelData);
       } else {
         // Fallback demo data if payload.claude is empty
         clModelData = {
@@ -3570,7 +3569,7 @@ async function fetchRealTimeDashboardData() {
       // REMOVED duplicate renderCopilot() from here
     }
     if (payload.wispr) {
-      console.log(`wispr : ${JSON.stringify(payload.wispr)}`);
+      // console.log(`wispr : ${JSON.stringify(payload.wispr)}`);
 
       renderWisprFlow(payload.wispr);
       const sortedUsers = sortWisprUsersByRole(payload?.wispr.users);
@@ -3597,11 +3596,10 @@ async function fetchRealTimeDashboardData() {
     renderClaude();
     renderCopilot();
     renderClModelChart(payload.claude);
-    console.log("claude_model_daily_usage", payload.claude_model_daily_usage);
+    // console.log("claude_model_daily_usage", payload.claude_model_daily_usage);
     renderModelTokenDoughnut(payload.claude_model_daily_usage, { raw: true }); // TODO Working on it.
     renderTeamTokenDoughnut(payload.claude);
     renderUserSpendChart(cpSeatsData, payload?.org_ai_credits);
-    console.log(`org_ai_credits`, payload);
     renderExecutiveCharts(clMembers, cpSeatsData);
 
     // 3. Trigger the "All" view to populate the Table and Stats automatically
